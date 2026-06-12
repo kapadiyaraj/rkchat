@@ -45,8 +45,6 @@ function doRegister() {
   socket.emit("register", { phone, username: name });
   socket.once("registered", () => {
     me = { phone, username: name };
-    // Save to sessionStorage so page refresh remembers
-    // sessionStorage.setItem("me", JSON.stringify(me));
     localStorage.setItem("me", JSON.stringify(me));
     loadSavedContacts();
     document.getElementById("my-name").textContent = name;
@@ -57,9 +55,8 @@ function doRegister() {
   });
 }
 
-// ── Saved contacts (sessionStorage) ──
+// ── Saved contacts ──
 function loadSavedContacts() {
-  // const saved = sessionStorage.getItem("contacts_" + me.phone);
   const saved = localStorage.getItem("contacts_" + me.phone);
   if (saved) {
     contacts = JSON.parse(saved);
@@ -68,7 +65,6 @@ function loadSavedContacts() {
   }
 }
 function saveContacts() {
-  // sessionStorage.setItem("contacts_" + me.phone, JSON.stringify(contacts));
   localStorage.setItem("contacts_" + me.phone, JSON.stringify(contacts));
 }
 
@@ -102,7 +98,6 @@ socket.on("contact-found", (contact) => {
   res.className = "add-result ok";
   res.textContent = `Found: ${contact.username} (+91 ${contact.phone})`;
 
-  // Replace search button with "Add" button
   const sb = document.getElementById("search-btn");
   sb.textContent = "Add Contact";
   sb.onclick = () => {
@@ -136,7 +131,6 @@ function addContact(contact) {
 
 // ── Render contact in sidebar ──
 function renderContactItem(contact) {
-  // Remove existing if any
   const existing = document.querySelector(`.contact-item[data-phone="${contact.phone}"]`);
   if (existing) existing.remove();
 
@@ -186,7 +180,6 @@ function renderContactItem(contact) {
 
   li.addEventListener("click", () => openChat(contact.phone));
 
-  // Prepend so newest contact is on top
   const list = document.getElementById("contacts-list");
   const empty = list.querySelector(".empty-contacts");
   if (empty) empty.remove();
@@ -218,36 +211,36 @@ function openChat(phone) {
   activePhone = phone;
   const contact = contacts[phone];
 
-  // Mark active
   document.querySelectorAll(".contact-item").forEach(li => li.classList.remove("active"));
   const li = document.querySelector(`.contact-item[data-phone="${phone}"]`);
   if (li) li.classList.add("active");
 
-  // Clear unread
   contact.unread = 0;
   const badge = document.getElementById("badge_" + phone);
   if (badge) badge.style.display = "none";
   saveContacts();
 
-  // Show chat UI
   document.getElementById("chat-empty").classList.add("hidden");
   document.getElementById("chat-header").classList.remove("hidden");
   document.getElementById("messages").classList.remove("hidden");
   document.getElementById("typing-bar").classList.remove("hidden");
   document.getElementById("input-bar").classList.remove("hidden");
 
-  // Set header info
   document.getElementById("chat-contact-name").textContent = contact.username;
   document.getElementById("chat-contact-status").textContent = contact.online ? "online" : "+91 " + contact.phone;
 
   const av = document.getElementById("chat-avatar");
   setAvatar(av, contact.username, contact.phone, 38);
 
-  // Render messages
   const msgsEl = document.getElementById("messages");
   msgsEl.innerHTML = "";
   contact.messages.forEach(m => appendBubble(m, false));
   msgsEl.scrollTop = msgsEl.scrollHeight;
+
+  // Mobile layout helper
+  if (window.innerWidth <= 768) {
+    document.querySelector(".sidebar").classList.add("hidden");
+  }
 
   document.getElementById("msg-input").focus();
 }
@@ -295,7 +288,6 @@ function sendMsg() {
 }
 
 socket.on("receive-message", ({ fromPhone, fromName, message, timestamp }) => {
-  // Ensure contact exists
   if (!contacts[fromPhone]) {
     contacts[fromPhone] = {
       phone: fromPhone, username: fromName, online: true,
@@ -320,7 +312,6 @@ socket.on("receive-message", ({ fromPhone, fromName, message, timestamp }) => {
   updateLastMsg(fromPhone, message, timestamp);
   saveContacts();
 
-  // Move contact to top
   const li = document.querySelector(`.contact-item[data-phone="${fromPhone}"]`);
   if (li) document.getElementById("contacts-list").prepend(li);
 });
@@ -344,7 +335,6 @@ function updateLastMsg(phone, text, time) {
   if (timeEl) timeEl.textContent = time;
 }
 
-// Typing indicator
 socket.on("typing", ({ fromPhone, isTyping }) => {
   if (fromPhone !== activePhone) return;
   clearTimeout(typingTimers[fromPhone]);
@@ -357,19 +347,46 @@ socket.on("typing", ({ fromPhone, isTyping }) => {
   }
 });
 
-// ── CALLS ──
+// ── CALL LOGIC FIXES ──
+function initCallUI(peerPhone, peerName, type) {
+  document.getElementById("call-overlay").classList.remove("hidden");
+  document.getElementById("call-peer-name").textContent = peerName;
+  document.getElementById("call-status-text").textContent = "Connecting…";
+  
+  const audioAv = document.getElementById("audio-avatar");
+  setAvatar(audioAv, peerName, peerPhone, 120);
+
+  if (type === "video") {
+    document.getElementById("remote-video").classList.remove("hidden");
+    document.getElementById("local-video").classList.remove("hidden");
+    audioAv.classList.add("hidden");
+    document.getElementById("btn-cam").classList.remove("active");
+  } else {
+    document.getElementById("remote-video").classList.add("hidden");
+    document.getElementById("local-video").classList.add("hidden");
+    audioAv.classList.remove("hidden");
+    document.getElementById("btn-cam").classList.add("active");
+  }
+}
+
 document.getElementById("voice-call-btn").addEventListener("click", () => {
-  if (activePhone) rtc.startCall(activePhone, "audio");
+  if (activePhone) {
+    initCallUI(activePhone, contacts[activePhone].username, "audio");
+    rtc.startCall(activePhone, "audio");
+  }
 });
+
 document.getElementById("video-call-btn").addEventListener("click", () => {
-  if (activePhone) rtc.startCall(activePhone, "video");
+  if (activePhone) {
+    initCallUI(activePhone, contacts[activePhone].username, "video");
+    rtc.startCall(activePhone, "video");
+  }
 });
 
 // Incoming call
 socket.on("incoming-call", ({ fromPhone, fromName, offer, callType }) => {
   pendingCall = { fromPhone, fromName, offer, callType };
 
-  // Auto-add to contacts if not there
   if (!contacts[fromPhone]) {
     contacts[fromPhone] = { phone: fromPhone, username: fromName, online: true, messages: [], unread: 0, lastMsg: "", lastTime: "" };
     renderContactItem(contacts[fromPhone]);
@@ -382,14 +399,12 @@ socket.on("incoming-call", ({ fromPhone, fromName, offer, callType }) => {
   setAvatar(av, fromName, fromPhone, 72);
 
   document.getElementById("modal-call").classList.remove("hidden");
-  document.getElementById("call-peer-name").textContent = fromName;
-  const audioAv = document.getElementById("audio-avatar");
-  setAvatar(audioAv, fromName, fromPhone, 120);
 });
 
 document.getElementById("btn-accept").addEventListener("click", () => {
   if (!pendingCall) return;
   document.getElementById("modal-call").classList.add("hidden");
+  initCallUI(pendingCall.fromPhone, pendingCall.fromName, pendingCall.callType);
   rtc.acceptCall(pendingCall.fromPhone, pendingCall.offer, pendingCall.callType);
   pendingCall = null;
 });
@@ -402,47 +417,57 @@ document.getElementById("btn-reject").addEventListener("click", () => {
   document.getElementById("modal-call").classList.add("hidden");
 });
 
-document.getElementById("btn-hangup").addEventListener("click", () => rtc.hangup());
-document.getElementById("btn-mute").addEventListener("click", () => rtc.toggleMute());
-document.getElementById("btn-cam").addEventListener("click", () => rtc.toggleCam());
-document.getElementById("btn-spk").addEventListener("click", () => {
-  // Speaker toggle — mainly cosmetic on desktop; on mobile this would switch output
-  document.getElementById("btn-spk").classList.toggle("active");
+// WebRTC logic listeners to close overlay
+function closeCallOverlay() {
+  document.getElementById("call-overlay").classList.add("hidden");
+  const localVid = document.getElementById("local-video");
+  const remoteVid = document.getElementById("remote-video");
+  if(localVid.srcObject) { localVid.srcObject.getTracks().forEach(t => t.stop()); localVid.srcObject = null; }
+  if(remoteVid.srcObject) { remoteVid.srcObject.getTracks().forEach(t => t.stop()); remoteVid.srcObject = null; }
+}
+
+document.getElementById("btn-hangup").addEventListener("click", () => {
+  rtc.hangup();
+  closeCallOverlay();
 });
 
-// ── Auto-login if session exists ──
-// window.addEventListener("load", () => {
-//   const saved = sessionStorage.getItem("me");
-//   if (saved) {
-//     const parsed = JSON.parse(saved);
-//     document.getElementById("reg-name").value = parsed.username;
-//     document.getElementById("reg-phone").value = parsed.phone;
-//   }
-// });
+socket.on("call-rejected", () => { alert("Call Rejected"); closeCallOverlay(); });
+socket.on("call-ended", () => { closeCallOverlay(); });
 
+document.getElementById("btn-mute").addEventListener("click", function() {
+  rtc.toggleMute();
+  this.classList.toggle("active");
+});
+
+document.getElementById("btn-cam").addEventListener("click", function() {
+  rtc.toggleCam();
+  this.classList.toggle("active");
+  document.getElementById("local-video").classList.toggle("hidden");
+});
+
+document.getElementById("btn-spk").addEventListener("click", function() {
+  this.classList.toggle("active");
+});
+
+// Back button for mobile
+document.getElementById("chat-back-btn").addEventListener("click", () => {
+  document.querySelector(".sidebar").classList.remove("hidden");
+  activePhone = null;
+});
+
+// ── Auto-login ──
 window.addEventListener("load", () => {
   const saved = localStorage.getItem("me");
-
   if (!saved) return;
-
   me = JSON.parse(saved);
 
-  socket.emit("register", {
-    phone: me.phone,
-    username: me.username,
-  });
+  socket.emit("register", { phone: me.phone, username: me.username });
 
   document.getElementById("my-name").textContent = me.username;
   document.getElementById("my-phone").textContent = "+91 " + me.phone;
-
-  setAvatar(
-    document.getElementById("my-avatar"),
-    me.username,
-    me.phone
-  );
+  setAvatar(document.getElementById("my-avatar"), me.username, me.phone);
 
   loadSavedContacts();
-
   document.getElementById("screen-register").classList.remove("active");
   document.getElementById("screen-app").classList.add("active");
 });

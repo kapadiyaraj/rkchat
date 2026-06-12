@@ -9,14 +9,13 @@
 </head>
 <body>
 
-<!-- ═══ REGISTER SCREEN ═══ -->
 <div id="screen-register" class="screen active">
   <div class="auth-card">
     <div class="brand">
       <div class="brand-icon">
         <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
           <circle cx="14" cy="14" r="14" fill="#25D366"/>
-          <path d="M20 17.5c-.3-.15-1.8-.9-2.1-1-.3-.1-.5-.15-.7.15-.2.3-.8 1-1 1.2-.18.2-.37.22-.67.07A8.4 8.4 0 0 1 13 16.1a8.1 8.1 0 0 1-1.7-2.5c-.18-.3 0-.47.13-.62.14-.14.3-.37.45-.56.15-.18.2-.3.3-.5.1-.2.05-.38-.02-.53-.08-.15-.7-1.7-.96-2.33-.25-.6-.5-.52-.7-.53h-.6c-.2 0-.52.07-.8.38C8.87 9.25 8 10.1 8 11.8s1.26 3.44 1.44 3.68c.17.23 2.5 3.8 6.05 5.33.85.36 1.5.58 2.02.74.85.27 1.62.23 2.23.14.68-.1 2.1-.86 2.4-1.7.3-.83.3-1.55.2-1.7-.1-.14-.3-.22-.6-.37z" fill="white"/>
+          <path d="M20 17.5c-.3-.15-1.8-.9-2.1-1-.3-.1-.5-.15-.7.15-.2.3-.8 1-1 1.2-.18.2-.37.22-.67.07A8.4 8.4 0 0 1 13 16.1a8.1 8.1 0 0 1-1.7-2.5c-.18-.3 0-.47.13-.62.14-.14.3-.37.45-.56.15-.18.2-.3].3-.5.1-.2.05-.38-.02-.53-.08-.15-.7-1.7-.96-2.33-.25-.6-.5-.52-.7-.53h-.6c-.2 0-.52.07-.8.38C8.87 9.25 8 10.1 8 11.8s1.26 3.44 1.44 3.68c.17.23 2.5 3.8 6.05 5.33.85.36 1.5.58 2.02.74.85.27 1.62.23 2.23.14.68-.1 2.1-.86 2.4-1.7.3-.83.3-1.55.2-1.7-.1-.14-.3-.22-.6-.37z" fill="white"/>
         </svg>
       </div>
       <span class="brand-name">FriendCall</span>
@@ -39,10 +38,8 @@
   </div>
 </div>
 
-<!-- ═══ MAIN APP ═══ -->
 <div id="screen-app" class="screen">
 
-  <!-- LEFT: contacts sidebar -->
   <aside class="sidebar">
     <div class="sidebar-top">
       <div class="my-profile">
@@ -79,9 +76,7 @@
     </ul>
   </aside>
 
-  <!-- RIGHT: chat area -->
   <main class="chat-area" id="chat-area">
-    <!-- Empty state -->
     <div class="chat-empty" id="chat-empty">
       <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ddd" stroke-width="1.2">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -89,9 +84,14 @@
       <p>Select a contact to start chatting</p>
     </div>
 
-    <!-- Chat header (shown when contact selected) -->
     <div class="chat-header hidden" id="chat-header">
       <div class="chat-contact-info">
+        <button id="chat-back-btn" class="action-btn back-md-btn" title="Back">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+        </button>
         <div class="avatar sm" id="chat-avatar"></div>
         <div>
           <div class="chat-contact-name" id="chat-contact-name"></div>
@@ -113,13 +113,10 @@
       </div>
     </div>
 
-    <!-- Messages -->
     <div class="messages hidden" id="messages"></div>
 
-    <!-- Typing -->
     <div class="typing-bar hidden" id="typing-bar"></div>
 
-    <!-- Input -->
     <div class="input-bar hidden" id="input-bar">
       <textarea id="msg-input" placeholder="Type a message…" rows="1" maxlength="2000"></textarea>
       <button id="send-btn" class="btn-send">
@@ -132,7 +129,6 @@
   </main>
 </div>
 
-<!-- ═══ ADD CONTACT MODAL ═══ -->
 <div id="modal-add" class="modal-bg hidden">
   <div class="modal">
     <div class="modal-title">Add Contact</div>
@@ -151,7 +147,6 @@
   </div>
 </div>
 
-<!-- ═══ INCOMING CALL MODAL ═══ -->
 <div id="modal-call" class="modal-bg hidden">
   <div class="modal call-modal">
     <div class="call-avatar" id="inc-avatar"></div>
@@ -175,7 +170,6 @@
   </div>
 </div>
 
-<!-- ═══ ACTIVE CALL OVERLAY ═══ -->
 <div id="call-overlay" class="call-overlay hidden">
   <div class="call-screen">
     <div class="remote-wrap">

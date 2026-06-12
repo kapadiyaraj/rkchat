@@ -83,6 +83,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .chat-actions{display:flex;gap:4px}
 .action-btn{width:40px;height:40px;border-radius:50%;border:none;background:none;cursor:pointer;color:var(--muted);display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s}
 .action-btn:hover{background:var(--bg);color:var(--green-d)}
+.back-md-btn{display:none}
 
 /* messages */
 .messages{flex:1;overflow-y:auto;padding:16px 10%;display:flex;flex-direction:column;gap:4px;scroll-behavior:smooth}
@@ -93,7 +94,6 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .mine .bubble{background:#D9FDD3;border-bottom-right-radius:2px;color:var(--text)}
 .theirs .bubble{background:var(--surface);border-bottom-left-radius:2px;color:var(--text)}
 .bubble .btime{font-size:11px;color:var(--hint);margin-top:2px;text-align:right;display:block}
-.system-msg{text-align:center;font-size:12px;color:var(--hint);padding:6px 16px;background:rgba(255,255,255,0.7);border-radius:8px;margin:8px auto;max-width:280px}
 
 /* typing */
 .typing-bar{padding:6px 10%;font-size:13px;color:var(--muted);font-style:italic;background:transparent;min-height:28px}
@@ -105,7 +105,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .btn-send:hover{background:var(--green-d)}
 .btn-send:active{transform:scale(.94)}
 
-/* ── ADD CONTACT MODAL ── */
+/* ── MODALS ── */
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;display:flex;align-items:center;justify-content:center}
 .modal{background:var(--surface);border-radius:16px;padding:28px 32px;width:380px;max-width:94vw;box-shadow:0 8px 40px rgba(0,0,0,0.15)}
 .modal-title{font-size:17px;font-weight:600;margin-bottom:20px}
@@ -118,7 +118,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .modal-btns .btn-green{flex:1;margin-top:0;padding:11px}
 
 /* ── INCOMING CALL MODAL ── */
-.call-modal{text-align:center;padding:36px 40px}
+.call-modal{text-align:center;padding:36px 40px;z-index:1100}
 .call-avatar{width:72px;height:72px;border-radius:50%;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700}
 .call-name{font-size:22px;font-weight:700;margin-bottom:4px}
 .call-type-label{font-size:14px;color:var(--muted);margin-bottom:28px}
@@ -136,11 +136,11 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .remote-wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
 #remote-video{width:100%;height:100%;object-fit:cover}
 .audio-avatar{width:120px;height:120px;border-radius:50%;font-size:40px;font-weight:700;display:flex;align-items:center;justify-content:center}
-#local-video{position:absolute;top:20px;right:20px;width:130px;border-radius:12px;aspect-ratio:3/4;object-fit:cover;border:2px solid rgba(255,255,255,0.3);background:#333}
-.call-info{position:absolute;top:28px;left:50%;transform:translateX(-50%);text-align:center;color:#fff}
+#local-video{position:absolute;top:20px;right:20px;width:130px;border-radius:12px;aspect-ratio:3/4;object-fit:cover;border:2px solid rgba(255,255,255,0.3);background:#333;z-index:1010}
+.call-info{position:absolute;top:28px;left:50%;transform:translateX(-50%);text-align:center;color:#fff;z-index:1010}
 .call-peer-name{font-size:22px;font-weight:700;text-shadow:0 1px 4px rgba(0,0,0,0.5)}
 .call-status-text{font-size:14px;margin-top:4px;opacity:.8}
-.call-controls{position:absolute;bottom:40px;display:flex;gap:20px;align-items:center}
+.call-controls{position:absolute;bottom:40px;display:flex;gap:20px;align-items:center;z-index:1010}
 .ctrl{width:60px;height:60px;border-radius:50%;border:none;background:rgba(255,255,255,.15);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .1s}
 .ctrl:hover{background:rgba(255,255,255,.25)}
 .ctrl.active{background:rgba(255,255,255,.9);color:#111}
@@ -153,7 +153,51 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 ::-webkit-scrollbar{width:5px}
 ::-webkit-scrollbar-thumb{background:#ccc;border-radius:10px}
 
-@media(max-width:640px){
-  .sidebar{width:100%;position:absolute;z-index:10}
-  #screen-app{position:relative}
+/* ── RESPONSIVE RESPONSIVE ── */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100%;
+    height: 100%;
+  }
+  .sidebar.hidden {
+    display: none !important;
+  }
+  .chat-area {
+    width: 100%;
+    height: 100%;
+  }
+  .back-md-btn {
+    display: flex;
+  }
+  .messages {
+    padding: 12px;
+  }
+  .bubble {
+    max-width: 85%;
+  }
+  .chat-header {
+    padding: 10px;
+  }
+  .chat-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .action-btn {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+  }
+  #local-video {
+    width: 90px;
+    top: 10px;
+    right: 10px;
+  }
+  .call-controls {
+    gap: 12px;
+    bottom: 20px;
+  }
+  .ctrl {
+    width: 52px;
+    height: 52px;
+  }
 }
