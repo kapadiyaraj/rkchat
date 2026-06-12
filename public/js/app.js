@@ -46,7 +46,8 @@ function doRegister() {
   socket.once("registered", () => {
     me = { phone, username: name };
     // Save to sessionStorage so page refresh remembers
-    sessionStorage.setItem("me", JSON.stringify(me));
+    // sessionStorage.setItem("me", JSON.stringify(me));
+    localStorage.setItem("me", JSON.stringify(me));
     loadSavedContacts();
     document.getElementById("my-name").textContent = name;
     document.getElementById("my-phone").textContent = "+91 " + phone;
@@ -58,7 +59,8 @@ function doRegister() {
 
 // ── Saved contacts (sessionStorage) ──
 function loadSavedContacts() {
-  const saved = sessionStorage.getItem("contacts_" + me.phone);
+  // const saved = sessionStorage.getItem("contacts_" + me.phone);
+  const saved = localStorage.getItem("contacts_" + me.phone);
   if (saved) {
     contacts = JSON.parse(saved);
     Object.values(contacts).forEach(c => renderContactItem(c));
@@ -66,7 +68,8 @@ function loadSavedContacts() {
   }
 }
 function saveContacts() {
-  sessionStorage.setItem("contacts_" + me.phone, JSON.stringify(contacts));
+  // sessionStorage.setItem("contacts_" + me.phone, JSON.stringify(contacts));
+  localStorage.setItem("contacts_" + me.phone, JSON.stringify(contacts));
 }
 
 // ── Add Contact ──
@@ -408,13 +411,40 @@ document.getElementById("btn-spk").addEventListener("click", () => {
 });
 
 // ── Auto-login if session exists ──
+// window.addEventListener("load", () => {
+//   const saved = sessionStorage.getItem("me");
+//   if (saved) {
+//     const parsed = JSON.parse(saved);
+//     document.getElementById("reg-name").value = parsed.username;
+//     document.getElementById("reg-phone").value = parsed.phone;
+//   }
+// });
+
 window.addEventListener("load", () => {
-  const saved = sessionStorage.getItem("me");
-  if (saved) {
-    const parsed = JSON.parse(saved);
-    document.getElementById("reg-name").value = parsed.username;
-    document.getElementById("reg-phone").value = parsed.phone;
-  }
+  const saved = localStorage.getItem("me");
+
+  if (!saved) return;
+
+  me = JSON.parse(saved);
+
+  socket.emit("register", {
+    phone: me.phone,
+    username: me.username,
+  });
+
+  document.getElementById("my-name").textContent = me.username;
+  document.getElementById("my-phone").textContent = "+91 " + me.phone;
+
+  setAvatar(
+    document.getElementById("my-avatar"),
+    me.username,
+    me.phone
+  );
+
+  loadSavedContacts();
+
+  document.getElementById("screen-register").classList.remove("active");
+  document.getElementById("screen-app").classList.add("active");
 });
 
 // ── Helpers ──
