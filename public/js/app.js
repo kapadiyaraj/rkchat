@@ -220,6 +220,10 @@ function openChat(phone) {
   if (badge) badge.style.display = "none";
   saveContacts();
 
+  // મોબાઈલ ઓબ્સ્ટેકલ અહી ફિક્સ થશે: active-chat ક્લાસ એડ થશે
+  const chatArea = document.getElementById("chat-area");
+  chatArea.classList.add("active-chat");
+
   document.getElementById("chat-empty").classList.add("hidden");
   document.getElementById("chat-header").classList.remove("hidden");
   document.getElementById("messages").classList.remove("hidden");
@@ -237,13 +241,14 @@ function openChat(phone) {
   contact.messages.forEach(m => appendBubble(m, false));
   msgsEl.scrollTop = msgsEl.scrollHeight;
 
-  // Mobile layout helper
-  if (window.innerWidth <= 768) {
-    document.querySelector(".sidebar").classList.add("hidden");
-  }
-
   document.getElementById("msg-input").focus();
 }
+
+// મોબાઈલ વ્યુમાં બેક જવા માટે ક્લિક લિસનર
+document.getElementById("chat-back-btn").addEventListener("click", () => {
+  document.getElementById("chat-area").classList.remove("active-chat");
+  activePhone = null;
+});
 
 // ── Messaging ──
 document.getElementById("send-btn").addEventListener("click", sendMsg);
@@ -347,7 +352,7 @@ socket.on("typing", ({ fromPhone, isTyping }) => {
   }
 });
 
-// ── CALL LOGIC FIXES ──
+// ── CALLS UI LOGIC & SPEAKER BUG FIX ──
 function initCallUI(peerPhone, peerName, type) {
   document.getElementById("call-overlay").classList.remove("hidden");
   document.getElementById("call-peer-name").textContent = peerName;
@@ -356,16 +361,25 @@ function initCallUI(peerPhone, peerName, type) {
   const audioAv = document.getElementById("audio-avatar");
   setAvatar(audioAv, peerName, peerPhone, 120);
 
+  const remoteVideo = document.getElementById("remote-video");
+
+  // સ્પીકર બગ સોલ્યુશન: બાયડિફોલ્ટ અવાજ ઓછો (ઇયરપીસ જેવો) રાખવા માટે વોલ્યુમ 0.2/0.3 સેટ કરી શકાય
+  // જો બ્રાઉઝર સપોર્ટ કરે તો હેન્ડસેટ આઉટપુટ પર મોકલાશે, સ્પીકર બટન દબાવતા જ ફૂલ થશે.
+  remoteVideo.volume = 0.3; 
+
   if (type === "video") {
-    document.getElementById("remote-video").classList.remove("hidden");
+    remoteVideo.classList.remove("hidden");
     document.getElementById("local-video").classList.remove("hidden");
     audioAv.classList.add("hidden");
     document.getElementById("btn-cam").classList.remove("active");
+    document.getElementById("btn-spk").classList.add("active"); // વિડીયોમાં સ્પીકર બાયડિફોલ્ટ ઓન રાખવું પડે
+    remoteVideo.volume = 1.0;
   } else {
-    document.getElementById("remote-video").classList.add("hidden");
+    remoteVideo.classList.add("hidden");
     document.getElementById("local-video").classList.add("hidden");
     audioAv.classList.remove("hidden");
     document.getElementById("btn-cam").classList.add("active");
+    document.getElementById("btn-spk").classList.remove("active"); // વોઇસ કોલમાં શરૂઆતમાં સ્પીકર ઓફ (ઇયરપીસ મોડ)
   }
 }
 
@@ -375,7 +389,6 @@ document.getElementById("voice-call-btn").addEventListener("click", () => {
     rtc.startCall(activePhone, "audio");
   }
 });
-
 document.getElementById("video-call-btn").addEventListener("click", () => {
   if (activePhone) {
     initCallUI(activePhone, contacts[activePhone].username, "video");
@@ -417,7 +430,6 @@ document.getElementById("btn-reject").addEventListener("click", () => {
   document.getElementById("modal-call").classList.add("hidden");
 });
 
-// WebRTC logic listeners to close overlay
 function closeCallOverlay() {
   document.getElementById("call-overlay").classList.add("hidden");
   const localVid = document.getElementById("local-video");
@@ -445,14 +457,15 @@ document.getElementById("btn-cam").addEventListener("click", function() {
   document.getElementById("local-video").classList.toggle("hidden");
 });
 
+// સ્પીકર બટન હેન્ડલર - વોલ્યુમ ઓપ્ટિમાઈઝેશન
 document.getElementById("btn-spk").addEventListener("click", function() {
   this.classList.toggle("active");
-});
-
-// Back button for mobile
-document.getElementById("chat-back-btn").addEventListener("click", () => {
-  document.querySelector(".sidebar").classList.remove("hidden");
-  activePhone = null;
+  const remoteVideo = document.getElementById("remote-video");
+  if (this.classList.contains("active")) {
+    remoteVideo.volume = 1.0; // સ્પીકર ઓન તો ફૂલ અવાજ
+  } else {
+    remoteVideo.volume = 0.3; // સ્પીકર ઓફ તો ધીમો અવાજ (ઇયરપીસ ઇફેક્ટ)
+  }
 });
 
 // ── Auto-login ──
