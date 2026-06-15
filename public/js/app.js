@@ -1,100 +1,160 @@
 // FriendCall — main app logic
-
 const socket = io();
 const rtc = new RTC(socket);
 
 // ── State ──
-let me = null; // { phone, username }
-let contacts = {}; // phone -> { phone, username, messages:[], unread:0, lastMsg:'', lastTime:'' }
+let me = null;          // { phone, username }
+let contacts = {};      // phone -> { phone, username, messages:[], unread:0, lastMsg:'', lastTime:'' }
 let activePhone = null;
 let pendingCall = null; // { fromPhone, fromName, offer, callType }
 let typingTimers = {};
 let myTyping = false;
 let myTypingTimer = null;
 
+const ringtone = new Audio("/sounds/ringtone.mp3");
+ringtone.loop = true;
+
 // ── Avatar colors ──
 const COLORS = [
-  ["#dbeafe","#1e40af"],["#dcfce7","#166534"],["#fce7f3","#9d174d"],
-  ["#fef3c7","#92400e"],["#ede9fe","#5b21b6"],["#fee2e2","#991b1b"],
-  ["#e0f2fe","#0c4a6e"],["#d1fae5","#065f46"],
+  ["#dbeafe","#1e40af"], ["#dcfce7","#166534"], ["#fce7f3","#9d174d"],
+  ["#fef3c7","#92400e"], ["#ede9fe","#5b21b6"], ["#fee2e2","#991b1b"],
+  ["#e0f2fe","#0c4a6e"], ["#d1fae5","#065f46"],
 ];
-function avatarColor(phone) { return COLORS[(+phone[phone.length-1]) % COLORS.length]; }
-function initials(name) { return name.trim().split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2); }
-
-function setAvatar(el, name, phone, size=44) {
+function avatarColor(phone) { return COLORS[(+phone[phone.length - 1]) % COLORS.length]; }
+function initials(name) { return name.trim().split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2); }
+function setAvatar(el, name, phone, size = 44) {
   const [bg, color] = avatarColor(phone);
   el.style.background = bg;
   el.style.color = color;
-  el.style.width = size+"px";
-  el.style.height = size+"px";
+  el.style.width = size + "px";
+  el.style.height = size + "px";
   el.textContent = initials(name);
 }
 
-// ── Register ──
-const regBtn = document.getElementById("reg-btn");
-regBtn.addEventListener("click", doRegister);
-document.getElementById("reg-name").addEventListener("keydown", e => { if(e.key==="Enter") document.getElementById("reg-phone").focus(); });
-document.getElementById("reg-phone").addEventListener("keydown", e => { if(e.key==="Enter") doRegister(); });
+// ─────────────────────────────────────────
+// REGISTER & AUTO-LOGIN
+// ─────────────────────────────────────────
+document.getElementById("reg-btn").addEventListener("click", doRegister);
+document.getElementById("reg-name").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("reg-phone").focus(); });
+document.getElementById("reg-phone").addEventListener("keydown", e => { if (e.key === "Enter") doRegister(); });
 
 function doRegister() {
-  const name = document.getElementById("reg-name").value.trim();
-  const phone = document.getElementById("reg-phone").value.trim().replace(/\D/g,"");
-  if (!name) { shake(document.getElementById("reg-name")); return; }
+  const name  = document.getElementById("reg-name").value.trim();
+  const phone = document.getElementById("reg-phone").value.trim().replace(/\D/g, "");
+  if (!name)           { shake(document.getElementById("reg-name"));  return; }
   if (phone.length < 10) { shake(document.getElementById("reg-phone")); return; }
 
   socket.emit("register", { phone, username: name });
+
   socket.once("registered", () => {
     me = { phone, username: name };
     localStorage.setItem("me", JSON.stringify(me));
-    loadSavedContacts();
-    document.getElementById("my-name").textContent = name;
-    document.getElementById("my-phone").textContent = "+91 " + phone;
-    setAvatar(document.getElementById("my-avatar"), name, phone);
-    document.getElementById("screen-register").classList.remove("active");
-    document.getElementById("screen-app").classList.add("active");
+    initApp();
   });
 }
 
-// ── Saved contacts ──
+function initApp() {
+  document.getElementById("my-name").textContent  = me.username;
+  document.getElementById("my-phone").textContent = "+91 " + me.phone;
+  setAvatar(document.getElementById("my-avatar"), me.username, me.phone);
+
+  // મોંગો ડેટાબેઝમાંથી સેવ કરેલા કોન્ટેક્ટ્સ લાવવા માટે બેકએન્ડને રિક્વેસ્ટ મોકલો
+  socket.emit("load-contacts", { phone: me.phone });
+
+  loadSavedContacts(); // લોકલ સ્ટોરેજ બેકઅપ
+
+  document.getElementById("screen-register").classList.remove("active");
+  document.getElementById("screen-app").classList.add("active");
+}
+
+window.addEventListener("load", () => {
+  const saved = localStorage.getItem("me");
+  if (!saved) return;
+  me = JSON.parse(saved);
+
+  if (socket.connected) {
+    socket.emit("register", { phone: me.phone, username: me.username });
+    initApp();
+  } else {
+    socket.once("connect", () => {
+      socket.emit("register", { phone: me.phone, username: me.username });
+      initApp();
+    });
+  }
+});
+
+// સર્વર પરથી મોંગોના કોન્ટેક્ટ્સ લોડ થાય ત્યારે UI અપડેટ (ગ્લોબલ સ્કોપમાં સેટ કરેલું છે)
+socket.on("contacts-loaded", (savedContacts) => {
+  contacts = {};
+  document.getElementById("contacts-list").innerHTML = "";
+
+  savedContacts.forEach(contact => {
+    contacts[contact.phone] = {
+      phone: contact.phone,
+      username: contact.username,
+      online: false,
+      messages: [],
+      unread: 0,
+      lastMsg: "",
+      lastTime: ""
+    };
+    renderContactItem(contacts[contact.phone]);
+  });
+  updateEmptyState();
+});
+
+// ─────────────────────────────────────────
+// CONTACTS — LOCAL STORAGE & MODAL
+// ─────────────────────────────────────────
 function loadSavedContacts() {
   const saved = localStorage.getItem("contacts_" + me.phone);
   if (saved) {
     contacts = JSON.parse(saved);
     Object.values(contacts).forEach(c => renderContactItem(c));
-    updateEmptyState();
   }
+  updateEmptyState();
 }
 function saveContacts() {
   localStorage.setItem("contacts_" + me.phone, JSON.stringify(contacts));
 }
 
-// ── Add Contact ──
 document.getElementById("add-contact-btn").addEventListener("click", () => {
-  document.getElementById("modal-add").classList.remove("hidden");
   document.getElementById("add-phone-input").value = "";
-  document.getElementById("add-result").className = "add-result";
+  document.getElementById("add-result").className  = "add-result";
   document.getElementById("add-result").textContent = "";
+  document.getElementById("search-btn").textContent = "Search";
+  document.getElementById("search-btn").onclick = searchContact;
+  document.getElementById("modal-add").classList.remove("hidden");
   setTimeout(() => document.getElementById("add-phone-input").focus(), 100);
 });
+
 document.getElementById("cancel-add-btn").addEventListener("click", () => {
   document.getElementById("modal-add").classList.add("hidden");
 });
+
 document.getElementById("search-btn").addEventListener("click", searchContact);
-document.getElementById("add-phone-input").addEventListener("keydown", e => { if(e.key==="Enter") searchContact(); });
+document.getElementById("add-phone-input").addEventListener("keydown", e => { if (e.key === "Enter") searchContact(); });
 
 function searchContact() {
-  const phone = document.getElementById("add-phone-input").value.trim().replace(/\D/g,"");
+  const phone = document.getElementById("add-phone-input").value.trim().replace(/\D/g, "");
   if (phone.length < 10) { shake(document.getElementById("add-phone-input")); return; }
   socket.emit("find-contact", { phone });
 }
 
 socket.on("contact-found", (contact) => {
   const res = document.getElementById("add-result");
+
+  if (contact.phone === me.phone) {
+    res.className = "add-result err";
+    res.textContent = "You cannot add yourself.";
+    return;
+  }
   if (contacts[contact.phone]) {
     res.className = "add-result err";
     res.textContent = contact.username + " is already in your contacts.";
     return;
   }
+
   res.className = "add-result ok";
   res.textContent = `Found: ${contact.username} (+91 ${contact.phone})`;
 
@@ -116,23 +176,28 @@ socket.on("contact-error", (msg) => {
 
 function addContact(contact) {
   contacts[contact.phone] = {
-    phone: contact.phone,
+    phone:    contact.phone,
     username: contact.username,
-    online: contact.online,
+    online:   contact.online || false,
     messages: [],
-    unread: 0,
-    lastMsg: "",
+    unread:   0,
+    lastMsg:  "",
     lastTime: "",
   };
   saveContacts();
+  
+  socket.emit("save-contact", {
+    ownerPhone: me.phone,
+    contactPhone: contact.phone,
+    contactName: contact.username
+  });
+  
   renderContactItem(contacts[contact.phone]);
   updateEmptyState();
 }
 
-// ── Render contact in sidebar ──
 function renderContactItem(contact) {
-  const existing = document.querySelector(`.contact-item[data-phone="${contact.phone}"]`);
-  if (existing) existing.remove();
+  document.querySelector(`.contact-item[data-phone="${contact.phone}"]`)?.remove();
 
   const li = document.createElement("li");
   li.className = "contact-item";
@@ -144,16 +209,13 @@ function renderContactItem(contact) {
 
   const info = document.createElement("div");
   info.className = "info";
-
   const cname = document.createElement("div");
   cname.className = "cname";
   cname.textContent = contact.username;
-
   const clast = document.createElement("div");
   clast.className = "clast";
-  clast.textContent = contact.lastMsg || "+91 " + contact.phone;
   clast.id = "last_" + contact.phone;
-
+  clast.textContent = contact.lastMsg || "+91 " + contact.phone;
   info.append(cname, clast);
 
   const meta = document.createElement("div");
@@ -177,12 +239,10 @@ function renderContactItem(contact) {
 
   meta.append(ctime, badge, dot);
   li.append(av, info, meta);
-
   li.addEventListener("click", () => openChat(contact.phone));
 
   const list = document.getElementById("contacts-list");
-  const empty = list.querySelector(".empty-contacts");
-  if (empty) empty.remove();
+  list.querySelector(".empty-contacts")?.remove();
   list.prepend(li);
 }
 
@@ -191,71 +251,85 @@ function updateEmptyState() {
   if (Object.keys(contacts).length === 0 && !list.querySelector(".empty-contacts")) {
     const li = document.createElement("li");
     li.className = "empty-contacts";
-    li.innerHTML = `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><p>No contacts yet.<br/>Click + to add a friend.</p>`;
+    li.innerHTML = `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </svg><p>No contacts yet.<br/>Click + to add a friend.</p>`;
     list.appendChild(li);
   }
 }
 
-// ── Search contacts ──
-document.getElementById("search-input").addEventListener("input", function() {
+document.getElementById("search-input").addEventListener("input", function () {
   const q = this.value.toLowerCase();
   document.querySelectorAll(".contact-item").forEach(li => {
-    const name = li.querySelector(".cname").textContent.toLowerCase();
+    const name  = li.querySelector(".cname").textContent.toLowerCase();
     const phone = li.dataset.phone;
     li.style.display = (name.includes(q) || phone.includes(q)) ? "" : "none";
   });
 });
 
-// ── Open chat ──
+// ─────────────────────────────────────────
+// OPEN CHAT & MESSAGE HISTORY
+// ─────────────────────────────────────────
 function openChat(phone) {
   activePhone = phone;
   const contact = contacts[phone];
 
   document.querySelectorAll(".contact-item").forEach(li => li.classList.remove("active"));
-  const li = document.querySelector(`.contact-item[data-phone="${phone}"]`);
-  if (li) li.classList.add("active");
+  document.querySelector(`.contact-item[data-phone="${phone}"]`)?.classList.add("active");
 
   contact.unread = 0;
   const badge = document.getElementById("badge_" + phone);
   if (badge) badge.style.display = "none";
   saveContacts();
 
-  // મોબાઈલ ઓબ્સ્ટેકલ અહી ફિક્સ થશે: active-chat ક્લાસ એડ થશે
-  const chatArea = document.getElementById("chat-area");
-  chatArea.classList.add("active-chat");
-
+  document.getElementById("chat-area").classList.add("active-chat");
   document.getElementById("chat-empty").classList.add("hidden");
   document.getElementById("chat-header").classList.remove("hidden");
   document.getElementById("messages").classList.remove("hidden");
   document.getElementById("typing-bar").classList.remove("hidden");
   document.getElementById("input-bar").classList.remove("hidden");
 
-  document.getElementById("chat-contact-name").textContent = contact.username;
+  document.getElementById("chat-contact-name").textContent   = contact.username;
   document.getElementById("chat-contact-status").textContent = contact.online ? "online" : "+91 " + contact.phone;
+  setAvatar(document.getElementById("chat-avatar"), contact.username, contact.phone, 38);
 
-  const av = document.getElementById("chat-avatar");
-  setAvatar(av, contact.username, contact.phone, 38);
-
-  const msgsEl = document.getElementById("messages");
-  msgsEl.innerHTML = "";
-  contact.messages.forEach(m => appendBubble(m, false));
-  msgsEl.scrollTop = msgsEl.scrollHeight;
+  socket.emit("load-messages", { myPhone: me.phone, otherPhone: phone });
 
   document.getElementById("msg-input").focus();
 }
 
-// મોબાઈલ વ્યુમાં બેક જવા માટે ક્લિક લિસનર
+socket.on("message-history", (messages) => {
+  const msgsEl = document.getElementById("messages");
+  msgsEl.innerHTML = "";
+
+  messages.forEach(msg => {
+    appendBubble({
+      from: msg.fromPhone === me.phone ? "me" : "them",
+      text: msg.message,
+      timestamp: msg.timestamp
+    }, false);
+  });
+
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+});
+
+// Mobile — back button
 document.getElementById("chat-back-btn").addEventListener("click", () => {
   document.getElementById("chat-area").classList.remove("active-chat");
   activePhone = null;
 });
 
-// ── Messaging ──
+// ─────────────────────────────────────────
+// MESSAGING LOGIC
+// ─────────────────────────────────────────
 document.getElementById("send-btn").addEventListener("click", sendMsg);
 document.getElementById("msg-input").addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); }
 });
-document.getElementById("msg-input").addEventListener("input", function() {
+document.getElementById("msg-input").addEventListener("input", function () {
   autoResize(this);
   if (!myTyping && activePhone) {
     myTyping = true;
@@ -270,27 +344,31 @@ document.getElementById("msg-input").addEventListener("input", function() {
 
 function sendMsg() {
   const input = document.getElementById("msg-input");
-  const text = input.value.trim();
+  const text  = input.value.trim();
   if (!text || !activePhone) return;
-
-  const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const msgObj = { from: "me", text, timestamp };
 
   socket.emit("send-message", { toPhone: activePhone, message: text });
 
-  contacts[activePhone].messages.push(msgObj);
-  contacts[activePhone].lastMsg = text;
-  contacts[activePhone].lastTime = timestamp;
+  input.value = "";
+  autoResize(input);
+
+  myTyping = false;
+  clearTimeout(myTypingTimer);
+  socket.emit("typing", { toPhone: activePhone, isTyping: false });
+}
+
+socket.on("message-sent", ({ toPhone, message, timestamp }) => {
+  if (activePhone !== toPhone) return;
+  
+  const msgObj = { from: "me", text: message, timestamp };
+  contacts[toPhone].messages.push(msgObj);
+  contacts[toPhone].lastMsg  = message;
+  contacts[toPhone].lastTime = timestamp;
   saveContacts();
 
   appendBubble(msgObj, true);
-  updateLastMsg(activePhone, text, timestamp);
-
-  input.value = "";
-  autoResize(input);
-  myTyping = false;
-  socket.emit("typing", { toPhone: activePhone, isTyping: false });
-}
+  updateLastMsg(toPhone, message, timestamp);
+});
 
 socket.on("receive-message", ({ fromPhone, fromName, message, timestamp }) => {
   if (!contacts[fromPhone]) {
@@ -303,7 +381,7 @@ socket.on("receive-message", ({ fromPhone, fromName, message, timestamp }) => {
 
   const msgObj = { from: "them", text: message, timestamp };
   contacts[fromPhone].messages.push(msgObj);
-  contacts[fromPhone].lastMsg = message;
+  contacts[fromPhone].lastMsg  = message;
   contacts[fromPhone].lastTime = timestamp;
 
   if (activePhone === fromPhone) {
@@ -342,8 +420,8 @@ function updateLastMsg(phone, text, time) {
 
 socket.on("typing", ({ fromPhone, isTyping }) => {
   if (fromPhone !== activePhone) return;
-  clearTimeout(typingTimers[fromPhone]);
   const bar = document.getElementById("typing-bar");
+  clearTimeout(typingTimers[fromPhone]);
   if (isTyping) {
     bar.textContent = (contacts[fromPhone]?.username || "They") + " is typing…";
     typingTimers[fromPhone] = setTimeout(() => { bar.textContent = ""; }, 3000);
@@ -352,69 +430,102 @@ socket.on("typing", ({ fromPhone, isTyping }) => {
   }
 });
 
-// ── CALLS UI LOGIC & SPEAKER BUG FIX ──
+// ─────────────────────────────────────────
+// ONLINE / OFFLINE STATUS
+// ─────────────────────────────────────────
+socket.on("user-online", ({ phone }) => {
+  if (contacts[phone]) {
+    contacts[phone].online = true;
+    const dot = document.getElementById("dot_" + phone);
+    if (dot) dot.style.display = "block";
+    if (activePhone === phone)
+      document.getElementById("chat-contact-status").textContent = "online";
+  }
+});
+
+socket.on("user-offline", ({ phone }) => {
+  if (contacts[phone]) {
+    contacts[phone].online = false;
+    const dot = document.getElementById("dot_" + phone);
+    if (dot) dot.style.display = "none";
+    if (activePhone === phone)
+      document.getElementById("chat-contact-status").textContent = "+91 " + phone;
+  }
+});
+
+// ─────────────────────────────────────────
+// CALLS — UI & LOGIC
+// ─────────────────────────────────────────
 function initCallUI(peerPhone, peerName, type) {
   document.getElementById("call-overlay").classList.remove("hidden");
-  document.getElementById("call-peer-name").textContent = peerName;
+  document.getElementById("call-peer-name").textContent   = peerName;
   document.getElementById("call-status-text").textContent = "Connecting…";
-  
-  const audioAv = document.getElementById("audio-avatar");
+
+  const audioAv    = document.getElementById("audio-avatar");
+  const remoteVid  = document.getElementById("remote-video");
+  const localVid   = document.getElementById("local-video");
+  const btnCam     = document.getElementById("btn-cam");
+  const btnSpk     = document.getElementById("btn-spk");
+
   setAvatar(audioAv, peerName, peerPhone, 120);
 
-  const remoteVideo = document.getElementById("remote-video");
-
-  // સ્પીકર બગ સોલ્યુશન: બાયડિફોલ્ટ અવાજ ઓછો (ઇયરપીસ જેવો) રાખવા માટે વોલ્યુમ 0.2/0.3 સેટ કરી શકાય
-  // જો બ્રાઉઝર સપોર્ટ કરે તો હેન્ડસેટ આઉટપુટ પર મોકલાશે, સ્પીકર બટન દબાવતા જ ફૂલ થશે.
-  remoteVideo.volume = 0.3; 
-
   if (type === "video") {
-    remoteVideo.classList.remove("hidden");
-    document.getElementById("local-video").classList.remove("hidden");
+    remoteVid.classList.remove("hidden");
+    localVid.classList.remove("hidden");
     audioAv.classList.add("hidden");
-    document.getElementById("btn-cam").classList.remove("active");
-    document.getElementById("btn-spk").classList.add("active"); // વિડીયોમાં સ્પીકર બાયડિફોલ્ટ ઓન રાખવું પડે
-    remoteVideo.volume = 1.0;
+    btnCam.classList.remove("active");
+    btnSpk.classList.add("active");
+    remoteVid.volume = 1.0;
   } else {
-    remoteVideo.classList.add("hidden");
-    document.getElementById("local-video").classList.add("hidden");
+    remoteVid.classList.add("hidden");
+    localVid.classList.add("hidden");
     audioAv.classList.remove("hidden");
-    document.getElementById("btn-cam").classList.add("active");
-    document.getElementById("btn-spk").classList.remove("active"); // વોઇસ કોલમાં શરૂઆતમાં સ્પીકર ઓફ (ઇયરપીસ મોડ)
+    btnCam.classList.add("active");
+    btnSpk.classList.remove("active");
+    remoteVid.volume = 0.4;
   }
 }
 
 document.getElementById("voice-call-btn").addEventListener("click", () => {
-  if (activePhone) {
-    initCallUI(activePhone, contacts[activePhone].username, "audio");
-    rtc.startCall(activePhone, "audio");
-  }
-});
-document.getElementById("video-call-btn").addEventListener("click", () => {
-  if (activePhone) {
-    initCallUI(activePhone, contacts[activePhone].username, "video");
-    rtc.startCall(activePhone, "video");
-  }
+  if (!activePhone) return;
+  initCallUI(activePhone, contacts[activePhone].username, "audio");
+  rtc.startCall(activePhone, "audio");
 });
 
-// Incoming call
+document.getElementById("video-call-btn").addEventListener("click", () => {
+  if (!activePhone) return;
+  initCallUI(activePhone, contacts[activePhone].username, "video");
+  rtc.startCall(activePhone, "video");
+});
+
+document.getElementById("logout-btn").addEventListener("click", () => {
+  if (!confirm("Logout from FriendCall?")) return;
+  localStorage.removeItem("me");
+  socket.disconnect();
+  location.reload();
+});
+
 socket.on("incoming-call", ({ fromPhone, fromName, offer, callType }) => {
+  ringtone.play().catch(err => console.warn("Ringtone blocked:", err));
   pendingCall = { fromPhone, fromName, offer, callType };
 
   if (!contacts[fromPhone]) {
-    contacts[fromPhone] = { phone: fromPhone, username: fromName, online: true, messages: [], unread: 0, lastMsg: "", lastTime: "" };
+    contacts[fromPhone] = {
+      phone: fromPhone, username: fromName, online: true,
+      messages: [], unread: 0, lastMsg: "", lastTime: "",
+    };
     renderContactItem(contacts[fromPhone]);
     saveContacts();
   }
 
   document.getElementById("inc-name").textContent = fromName;
   document.getElementById("inc-type").textContent = callType === "video" ? "Incoming video call…" : "Incoming voice call…";
-  const av = document.getElementById("inc-avatar");
-  setAvatar(av, fromName, fromPhone, 72);
-
+  setAvatar(document.getElementById("inc-avatar"), fromName, fromPhone, 72);
   document.getElementById("modal-call").classList.remove("hidden");
 });
 
 document.getElementById("btn-accept").addEventListener("click", () => {
+  stopRingtone();
   if (!pendingCall) return;
   document.getElementById("modal-call").classList.add("hidden");
   initCallUI(pendingCall.fromPhone, pendingCall.fromName, pendingCall.callType);
@@ -423,6 +534,7 @@ document.getElementById("btn-accept").addEventListener("click", () => {
 });
 
 document.getElementById("btn-reject").addEventListener("click", () => {
+  stopRingtone();
   if (pendingCall) {
     socket.emit("reject-call", { toPhone: pendingCall.fromPhone });
     pendingCall = null;
@@ -430,74 +542,73 @@ document.getElementById("btn-reject").addEventListener("click", () => {
   document.getElementById("modal-call").classList.add("hidden");
 });
 
-function closeCallOverlay() {
-  document.getElementById("call-overlay").classList.add("hidden");
-  const localVid = document.getElementById("local-video");
-  const remoteVid = document.getElementById("remote-video");
-  if(localVid.srcObject) { localVid.srcObject.getTracks().forEach(t => t.stop()); localVid.srcObject = null; }
-  if(remoteVid.srcObject) { remoteVid.srcObject.getTracks().forEach(t => t.stop()); remoteVid.srcObject = null; }
-}
+socket.on("call-rejected", () => {
+  stopRingtone();
+  alert("Call was rejected.");
+  closeCallOverlay();
+});
+
+socket.on("call-ended", () => {
+  stopRingtone();
+  closeCallOverlay();
+});
 
 document.getElementById("btn-hangup").addEventListener("click", () => {
   rtc.hangup();
   closeCallOverlay();
 });
 
-socket.on("call-rejected", () => { alert("Call Rejected"); closeCallOverlay(); });
-socket.on("call-ended", () => { closeCallOverlay(); });
-
-document.getElementById("btn-mute").addEventListener("click", function() {
+document.getElementById("btn-mute").addEventListener("click", function () {
   rtc.toggleMute();
   this.classList.toggle("active");
 });
 
-document.getElementById("btn-cam").addEventListener("click", function() {
+document.getElementById("btn-cam").addEventListener("click", function () {
   rtc.toggleCam();
   this.classList.toggle("active");
   document.getElementById("local-video").classList.toggle("hidden");
 });
 
-// સ્પીકર બટન હેન્ડલર - વોલ્યુમ ઓપ્ટિમાઈઝેશન
-document.getElementById("btn-spk").addEventListener("click", function() {
+document.getElementById("btn-spk").addEventListener("click", function () {
   this.classList.toggle("active");
-  const remoteVideo = document.getElementById("remote-video");
-  if (this.classList.contains("active")) {
-    remoteVideo.volume = 1.0; // સ્પીકર ઓન તો ફૂલ અવાજ
-  } else {
-    remoteVideo.volume = 0.3; // સ્પીકર ઓફ તો ધીમો અવાજ (ઇયરપીસ ઇફેક્ટ)
-  }
+  const remoteVid = document.getElementById("remote-video");
+  remoteVid.volume = this.classList.contains("active") ? 1.0 : 0.4;
 });
 
-// ── Auto-login ──
-window.addEventListener("load", () => {
-  const saved = localStorage.getItem("me");
-  if (!saved) return;
-  me = JSON.parse(saved);
-
-  socket.emit("register", { phone: me.phone, username: me.username });
-
-  document.getElementById("my-name").textContent = me.username;
-  document.getElementById("my-phone").textContent = "+91 " + me.phone;
-  setAvatar(document.getElementById("my-avatar"), me.username, me.phone);
-
-  loadSavedContacts();
-  document.getElementById("screen-register").classList.remove("active");
-  document.getElementById("screen-app").classList.add("active");
-});
-
-// ── Helpers ──
-function escHtml(s) {
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\n/g,"<br>");
+function stopRingtone() {
+  ringtone.pause();
+  ringtone.currentTime = 0;
 }
+
+function closeCallOverlay() {
+  document.getElementById("call-overlay").classList.add("hidden");
+  const localVid  = document.getElementById("local-video");
+  const remoteVid = document.getElementById("remote-video");
+  if (localVid.srcObject)  { localVid.srcObject.getTracks().forEach(t => t.stop());  localVid.srcObject  = null; }
+  if (remoteVid.srcObject) { remoteVid.srcObject.getTracks().forEach(t => t.stop()); remoteVid.srcObject = null; }
+}
+
+function escHtml(s) {
+  return s
+    .replace(/&/g,  "&amp;")
+    .replace(/</g,  "&lt;")
+    .replace(/>/g,  "&gt;")
+    .replace(/"/g,  "&quot;")
+    .replace(/\n/g, "<br>");
+}
+
 function autoResize(el) {
   el.style.height = "auto";
   el.style.height = Math.min(el.scrollHeight, 120) + "px";
 }
+
 function shake(el) {
-  el.style.animation = "none"; el.offsetHeight;
+  el.style.animation = "none";
+  el.offsetHeight; 
   el.style.animation = "shake .3s ease";
   setTimeout(() => el.style.animation = "", 400);
 }
+
 const sty = document.createElement("style");
 sty.textContent = `@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}`;
 document.head.appendChild(sty);
