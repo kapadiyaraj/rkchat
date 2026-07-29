@@ -1,278 +1,741 @@
-// rtc.js — WebRTC module (audio + video calls)
+// ======================================================
+// FriendCall - WebRTC
+// Audio + Video Calling
+// ======================================================
 
 class RTC {
   constructor(socket) {
-    this.socket     = socket;
-    this.pc         = null;
+    this.socket = socket;
+
+    this.pc = null;
     this.localStream = null;
-    this.peerPhone  = null;
-    this.callType   = null;   // "audio" | "video"
-    this.muted      = false;
-    this.camOff     = false;
+
+    this.peerPhone = null;
+    this.callType = null;
+
+    this.muted = false;
+    this.camOff = false;
 
     this.iceConfig = {
       iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun.cloudflare.com:3478" },
         {
-          urls:       "turn:openrelay.metered.ca:80",
-          username:   "openrelayproject",
-          credential: "openrelayproject",
+          urls:
+            "stun:stun.l.google.com:19302",
+        },
+
+        {
+          urls:
+            "stun:stun1.l.google.com:19302",
+        },
+
+        {
+          urls:
+            "stun:stun.cloudflare.com:3478",
+        },
+
+        {
+          urls:
+            "turn:openrelay.metered.ca:80",
+
+          username:
+            "openrelayproject",
+
+          credential:
+            "openrelayproject",
         },
       ],
     };
 
-    this._bindSocketEvents();
+    this.bindSocketEvents();
   }
 
-  // ─────────────────────────────────────
+  // ====================================================
   // SOCKET EVENTS
-  // ─────────────────────────────────────
-  _bindSocketEvents() {
-    // Remote ICE candidate
-    this.socket.on("ice-candidate", async ({ candidate }) => {
-      if (this.pc && candidate) {
+  // ====================================================
+
+  bindSocketEvents() {
+    this.socket.on(
+      "ice-candidate",
+      async ({ candidate }) => {
+        if (
+          !this.pc ||
+          !candidate
+        ) {
+          return;
+        }
+
         try {
-          await this.pc.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch (e) {
-          console.warn("ICE candidate error:", e);
+          await this.pc.addIceCandidate(
+            new RTCIceCandidate(
+              candidate
+            )
+          );
+        } catch (err) {
+          console.warn(
+            "ICE candidate error:",
+            err
+          );
         }
       }
-    });
+    );
 
-    // Caller: receives answer from callee
-    this.socket.on("call-answered", async ({ answer }) => {
-      if (!this.pc) return;
-      try {
-        await this.pc.setRemoteDescription(new RTCSessionDescription(answer));
-        this._setStatus("Connected");
-      } catch (e) {
-        console.error("setRemoteDescription error:", e);
+    this.socket.on(
+      "call-answered",
+      async ({ answer }) => {
+        if (!this.pc) return;
+
+        try {
+          await this.pc.setRemoteDescription(
+            new RTCSessionDescription(
+              answer
+            )
+          );
+
+          this.setStatus(
+            "Connected"
+          );
+        } catch (err) {
+          console.error(
+            "Remote description error:",
+            err
+          );
+        }
       }
-    });
+    );
 
-    // Call ended by remote peer
-    this.socket.on("call-ended", () => {
-      this._setStatus("Call ended");
-      setTimeout(() => this.hangup(true), 900);
-    });
+    this.socket.on(
+      "call-ended",
+      () => {
+        this.setStatus(
+          "Call ended"
+        );
 
-    // Call rejected by remote peer
-    this.socket.on("call-rejected", () => {
-      this._setStatus("Call declined");
-      setTimeout(() => this.hangup(true), 1200);
-    });
+        setTimeout(() => {
+          this.hangup(true);
+        }, 700);
+      }
+    );
 
-    // Server-side error
-    this.socket.on("call-failed", (msg) => {
-      alert("Call failed: " + msg);
-      this.hangup(true);
-    });
+    this.socket.on(
+      "call-rejected",
+      () => {
+        this.setStatus(
+          "Call declined"
+        );
+
+        setTimeout(() => {
+          this.hangup(true);
+        }, 900);
+      }
+    );
+
+    this.socket.on(
+      "call-failed",
+      (msg) => {
+        alert(
+          "Call failed: " + msg
+        );
+
+        this.hangup(true);
+      }
+    );
   }
 
-  // ─────────────────────────────────────
-  // BUILD PEER CONNECTION
-  // ─────────────────────────────────────
-  _buildPC(peerPhone) {
-    const pc = new RTCPeerConnection(this.iceConfig);
+  // ====================================================
+  // PEER CONNECTION
+  // ====================================================
 
-    // Send ICE candidates to peer
-    pc.onicecandidate = ({ candidate }) => {
-      if (candidate) {
-        this.socket.emit("ice-candidate", { toPhone: peerPhone, candidate });
+  buildPC(peerPhone) {
+    const pc =
+      new RTCPeerConnection(
+        this.iceConfig
+      );
+
+    pc.onicecandidate = ({
+      candidate,
+    }) => {
+      if (!candidate) return;
+
+      this.socket.emit(
+        "ice-candidate",
+        {
+          toPhone: peerPhone,
+          candidate,
+        }
+      );
+    };
+
+    pc.ontrack = ({
+      streams,
+    }) => {
+      const remoteVideo =
+        document.getElementById(
+          "remote-video"
+        );
+
+      if (
+        remoteVideo &&
+        streams[0]
+      ) {
+        remoteVideo.srcObject =
+          streams[0];
+
+        remoteVideo
+          .play()
+          .catch(() => {});
       }
     };
 
-    // Receive remote stream → attach to <video>
-    pc.ontrack = ({ streams }) => {
-      const rv = document.getElementById("remote-video");
-      if (rv && streams[0]) rv.srcObject = streams[0];
-    };
+    pc.oniceconnectionstatechange =
+      () => {
+        const state =
+          pc.iceConnectionState;
 
-    // Monitor connection state
-    pc.oniceconnectionstatechange = () => {
-      const s = pc.iceConnectionState;
-      if (s === "connected" || s === "completed") this._setStatus("Connected");
-      if (s === "failed")       this._setStatus("Connection failed — check network");
-      if (s === "disconnected") this._setStatus("Reconnecting…");
-    };
+        if (
+          state === "connected" ||
+          state === "completed"
+        ) {
+          this.setStatus(
+            "Connected"
+          );
+        }
 
-    // Add local tracks
+        if (
+          state === "failed"
+        ) {
+          this.setStatus(
+            "Connection failed"
+          );
+        }
+
+        if (
+          state ===
+          "disconnected"
+        ) {
+          this.setStatus(
+            "Reconnecting..."
+          );
+        }
+      };
+
     if (this.localStream) {
-      this.localStream.getTracks().forEach(t => pc.addTrack(t, this.localStream));
+      this.localStream
+        .getTracks()
+        .forEach((track) => {
+          pc.addTrack(
+            track,
+            this.localStream
+          );
+        });
     }
 
     return pc;
   }
 
-  // ─────────────────────────────────────
-  // GET USER MEDIA
-  // ─────────────────────────────────────
-  async _getMedia(wantVideo) {
-    // Try with requested video setting
+  // ====================================================
+  // CAMERA / MICROPHONE
+  // ====================================================
+
+  async getMedia(wantVideo) {
     try {
-      this.localStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: wantVideo,
-      });
-    } catch {
-      // Video failed → fallback to audio-only
+      this.localStream =
+        await navigator.mediaDevices
+          .getUserMedia({
+            audio: true,
+            video: wantVideo,
+          });
+    } catch (err) {
       if (wantVideo) {
         try {
-          this.localStream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-            video: false,
-          });
-          console.warn("Camera unavailable — falling back to audio-only.");
+          this.localStream =
+            await navigator
+              .mediaDevices
+              .getUserMedia({
+                audio: true,
+                video: false,
+              });
+
+          console.warn(
+            "Camera unavailable. Audio only."
+          );
+
+          this.callType =
+            "audio";
         } catch {
-          alert("Microphone access denied. Please allow mic access and try again.");
+          alert(
+            "Microphone access denied. Please allow microphone permission."
+          );
+
           return false;
         }
       } else {
-        alert("Microphone access denied. Please allow mic access and try again.");
+        alert(
+          "Microphone access denied. Please allow microphone permission."
+        );
+
         return false;
       }
     }
 
-    // Attach to local <video> preview
-    const lv = document.getElementById("local-video");
-    if (lv) lv.srcObject = this.localStream;
+    const localVideo =
+      document.getElementById(
+        "local-video"
+      );
+
+    if (localVideo) {
+      localVideo.srcObject =
+        this.localStream;
+
+      localVideo.muted = true;
+
+      localVideo
+        .play()
+        .catch(() => {});
+    }
 
     return true;
   }
 
-  // ─────────────────────────────────────
-  // OUTGOING CALL (Caller side)
-  // ─────────────────────────────────────
-  async startCall(peerPhone, callType = "video") {
-    this.peerPhone = peerPhone;
-    this.callType  = callType;
+  // ====================================================
+  // START OUTGOING CALL
+  // ====================================================
 
-    const ok = await this._getMedia(callType === "video");
-    if (!ok) return;
+  async startCall(
+    peerPhone,
+    callType = "video"
+  ) {
+    if (
+      this.pc ||
+      this.localStream
+    ) {
+      this.hangup(true);
+    }
 
-    this.pc = this._buildPC(peerPhone);
+    this.peerPhone =
+      peerPhone;
 
-    const offer = await this.pc.createOffer();
-    await this.pc.setLocalDescription(offer);
+    this.callType =
+      callType;
 
-    this.socket.emit("call-user", { toPhone: peerPhone, offer, callType });
-    this._setStatus("Calling…");
-    this._updateCallUI(callType);
+    const mediaReady =
+      await this.getMedia(
+        callType === "video"
+      );
+
+    if (!mediaReady) {
+      this.peerPhone = null;
+      return;
+    }
+
+    this.pc =
+      this.buildPC(
+        peerPhone
+      );
+
+    try {
+      const offer =
+        await this.pc.createOffer();
+
+      await this.pc.setLocalDescription(
+        offer
+      );
+
+      this.socket.emit(
+        "call-user",
+        {
+          toPhone:
+            peerPhone,
+
+          offer:
+            this.pc
+              .localDescription,
+
+          callType:
+            this.callType,
+        }
+      );
+
+      this.setStatus(
+        "Calling..."
+      );
+
+      this.updateCallUI(
+        this.callType
+      );
+    } catch (err) {
+      console.error(
+        "Start call error:",
+        err
+      );
+
+      this.hangup(true);
+    }
   }
 
-  // ─────────────────────────────────────
-  // INCOMING CALL (Callee side)
-  // ─────────────────────────────────────
-  async acceptCall(fromPhone, offer, callType = "video") {
-    this.peerPhone = fromPhone;
-    this.callType  = callType;
+  // ====================================================
+  // ACCEPT INCOMING CALL
+  // ====================================================
 
-    const ok = await this._getMedia(callType === "video");
-    if (!ok) return;
+  async acceptCall(
+    fromPhone,
+    offer,
+    callType = "video"
+  ) {
+    if (
+      this.pc ||
+      this.localStream
+    ) {
+      this.hangup(true);
+    }
 
-    this.pc = this._buildPC(fromPhone);
+    this.peerPhone =
+      fromPhone;
 
-    await this.pc.setRemoteDescription(new RTCSessionDescription(offer));
-    const answer = await this.pc.createAnswer();
-    await this.pc.setLocalDescription(answer);
+    this.callType =
+      callType;
 
-    this.socket.emit("call-answer", { toPhone: fromPhone, answer });
-    this._setStatus("Connecting…");
-    this._updateCallUI(callType);
+    const mediaReady =
+      await this.getMedia(
+        callType === "video"
+      );
+
+    if (!mediaReady) {
+      this.socket.emit(
+        "reject-call",
+        {
+          toPhone:
+            fromPhone,
+        }
+      );
+
+      this.peerPhone = null;
+
+      return;
+    }
+
+    this.pc =
+      this.buildPC(
+        fromPhone
+      );
+
+    try {
+      await this.pc.setRemoteDescription(
+        new RTCSessionDescription(
+          offer
+        )
+      );
+
+      const answer =
+        await this.pc.createAnswer();
+
+      await this.pc.setLocalDescription(
+        answer
+      );
+
+      this.socket.emit(
+        "call-answer",
+        {
+          toPhone:
+            fromPhone,
+
+          answer:
+            this.pc
+              .localDescription,
+        }
+      );
+
+      this.setStatus(
+        "Connecting..."
+      );
+
+      this.updateCallUI(
+        this.callType
+      );
+    } catch (err) {
+      console.error(
+        "Accept call error:",
+        err
+      );
+
+      this.hangup(true);
+    }
   }
 
-  // ─────────────────────────────────────
-  // HANG UP
-  // ─────────────────────────────────────
+  // ====================================================
+  // HANGUP
+  // ====================================================
+
   hangup(silent = false) {
-    // Notify peer
-    if (!silent && this.peerPhone) {
-      this.socket.emit("end-call", { toPhone: this.peerPhone });
+    if (
+      !silent &&
+      this.peerPhone
+    ) {
+      this.socket.emit(
+        "end-call",
+        {
+          toPhone:
+            this.peerPhone,
+        }
+      );
     }
 
-    // Close peer connection
-    if (this.pc) { this.pc.close(); this.pc = null; }
+    if (this.pc) {
+      this.pc.ontrack = null;
+      this.pc.onicecandidate = null;
 
-    // Stop local stream tracks
+      this.pc.close();
+      this.pc = null;
+    }
+
     if (this.localStream) {
-      this.localStream.getTracks().forEach(t => t.stop());
-      this.localStream = null;
+      this.localStream
+        .getTracks()
+        .forEach(
+          (track) =>
+            track.stop()
+        );
+
+      this.localStream =
+        null;
     }
 
-    // Clear video elements
-    ["remote-video", "local-video"].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.srcObject = null;
+    [
+      "remote-video",
+      "local-video",
+    ].forEach((id) => {
+      const element =
+        document.getElementById(
+          id
+        );
+
+      if (element) {
+        element.srcObject =
+          null;
+      }
     });
 
-    // Reset state
     this.peerPhone = null;
-    this.callType  = null;
-    this.muted     = false;
-    this.camOff    = false;
+    this.callType = null;
 
-    // Reset UI
-    document.getElementById("call-overlay").classList.add("hidden");
-    document.getElementById("btn-mute").classList.remove("active");
-    document.getElementById("btn-cam").classList.remove("active");
-    document.getElementById("btn-spk").classList.remove("active");
+    this.muted = false;
+    this.camOff = false;
+
+    const overlay =
+      document.getElementById(
+        "call-overlay"
+      );
+
+    if (overlay) {
+      overlay.classList.add(
+        "hidden"
+      );
+    }
+
+    const mute =
+      document.getElementById(
+        "btn-mute"
+      );
+
+    const cam =
+      document.getElementById(
+        "btn-cam"
+      );
+
+    const speaker =
+      document.getElementById(
+        "btn-spk"
+      );
+
+    mute?.classList.remove(
+      "active"
+    );
+
+    cam?.classList.remove(
+      "active"
+    );
+
+    speaker?.classList.remove(
+      "active"
+    );
   }
 
-  // ─────────────────────────────────────
-  // CONTROLS
-  // ─────────────────────────────────────
+  // ====================================================
+  // MUTE
+  // ====================================================
+
   toggleMute() {
-    if (!this.localStream) return;
-    this.muted = !this.muted;
-    this.localStream.getAudioTracks().forEach(t => t.enabled = !this.muted);
-    document.getElementById("btn-mute").classList.toggle("active", this.muted);
+    if (!this.localStream) {
+      return;
+    }
+
+    this.muted =
+      !this.muted;
+
+    this.localStream
+      .getAudioTracks()
+      .forEach((track) => {
+        track.enabled =
+          !this.muted;
+      });
+
+    document
+      .getElementById(
+        "btn-mute"
+      )
+      ?.classList.toggle(
+        "active",
+        this.muted
+      );
   }
+
+  // ====================================================
+  // CAMERA
+  // ====================================================
 
   toggleCam() {
-    if (!this.localStream) return;
-    this.camOff = !this.camOff;
-    this.localStream.getVideoTracks().forEach(t => t.enabled = !this.camOff);
-    // btn-cam "active" = cam is OFF
-    document.getElementById("btn-cam").classList.toggle("active", this.camOff);
-    document.getElementById("local-video").classList.toggle("hidden", this.camOff);
+    if (!this.localStream) {
+      return;
+    }
+
+    const tracks =
+      this.localStream
+        .getVideoTracks();
+
+    if (!tracks.length) {
+      return;
+    }
+
+    this.camOff =
+      !this.camOff;
+
+    tracks.forEach(
+      (track) => {
+        track.enabled =
+          !this.camOff;
+      }
+    );
+
+    document
+      .getElementById(
+        "btn-cam"
+      )
+      ?.classList.toggle(
+        "active",
+        this.camOff
+      );
+
+    document
+      .getElementById(
+        "local-video"
+      )
+      ?.classList.toggle(
+        "hidden",
+        this.camOff
+      );
   }
 
-  // ─────────────────────────────────────
-  // INTERNAL UI HELPERS
-  // ─────────────────────────────────────
-  _updateCallUI(callType) {
-    const lv      = document.getElementById("local-video");
-    const audioAv = document.getElementById("audio-avatar");
-    const btnCam  = document.getElementById("btn-cam");
-    const btnSpk  = document.getElementById("btn-spk");
-    const rv      = document.getElementById("remote-video");
+  // ====================================================
+  // CALL UI
+  // ====================================================
 
-    document.getElementById("call-overlay").classList.remove("hidden");
+  updateCallUI(callType) {
+    const localVideo =
+      document.getElementById(
+        "local-video"
+      );
+
+    const remoteVideo =
+      document.getElementById(
+        "remote-video"
+      );
+
+    const audioAvatar =
+      document.getElementById(
+        "audio-avatar"
+      );
+
+    const btnCam =
+      document.getElementById(
+        "btn-cam"
+      );
+
+    const btnSpeaker =
+      document.getElementById(
+        "btn-spk"
+      );
+
+    const overlay =
+      document.getElementById(
+        "call-overlay"
+      );
+
+    overlay?.classList.remove(
+      "hidden"
+    );
+
+    // IMPORTANT:
+    // speaker button starts OFF
+    btnSpeaker?.classList.remove(
+      "active"
+    );
+
+    if (remoteVideo) {
+      remoteVideo.volume =
+        0.4;
+    }
 
     if (callType === "video") {
-      // Video call: show video elements
-      rv.classList.remove("hidden");
-      lv.classList.remove("hidden");
-      audioAv.classList.add("hidden");
-      btnCam.classList.remove("hidden");
-      btnCam.classList.remove("active");   // cam ON
-      btnSpk.classList.add("active");      // speaker ON for video
-      rv.volume = 1.0;
+      remoteVideo?.classList.remove(
+        "hidden"
+      );
+
+      localVideo?.classList.remove(
+        "hidden"
+      );
+
+      audioAvatar?.classList.add(
+        "hidden"
+      );
+
+      btnCam?.classList.remove(
+        "hidden"
+      );
+
+      btnCam?.classList.remove(
+        "active"
+      );
     } else {
-      // Audio call: show avatar, hide video
-      rv.classList.add("hidden");
-      lv.classList.add("hidden");
-      audioAv.classList.remove("hidden");
-      btnCam.classList.add("hidden");      // hide cam button for audio calls
-      btnSpk.classList.remove("active");   // earpiece mode by default
-      rv.volume = 0.4;
+      remoteVideo?.classList.add(
+        "hidden"
+      );
+
+      localVideo?.classList.add(
+        "hidden"
+      );
+
+      audioAvatar?.classList.remove(
+        "hidden"
+      );
+
+      btnCam?.classList.add(
+        "hidden"
+      );
     }
   }
 
-  _setStatus(msg) {
-    const el = document.getElementById("call-status-text");
-    if (el) el.textContent = msg;
+  // ====================================================
+  // STATUS
+  // ====================================================
+
+  setStatus(message) {
+    const status =
+      document.getElementById(
+        "call-status-text"
+      );
+
+    if (status) {
+      status.textContent =
+        message;
+    }
   }
 }

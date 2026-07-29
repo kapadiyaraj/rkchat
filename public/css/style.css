@@ -815,3 +815,375 @@ button { cursor: pointer; }
   .call-peer-name { font-size: 20px; }
   #local-video { width: 75px; }
 }
+
+
+
+/* =====================================================
+   FRIENDCALL AUTHENTICATION
+   Register + Login
+===================================================== */
+
+.auth-error {
+  min-height: 20px;
+  margin-top: -5px;
+  margin-bottom: 8px;
+
+  color: #dc2626;
+
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+
+/* Login / Register switch */
+
+.auth-switch {
+  margin-top: 20px;
+
+  text-align: center;
+
+  font-size: 13px;
+
+  color: var(--muted);
+}
+
+
+.auth-link {
+  padding: 3px 5px;
+
+  border: none;
+
+  background: transparent;
+
+  color: var(--green-d);
+
+  font-size: 13px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    color 0.15s,
+    opacity 0.15s;
+}
+
+
+.auth-link:hover {
+  color: var(--green);
+  text-decoration: underline;
+}
+
+
+.auth-link:active {
+  opacity: 0.7;
+}
+
+
+/* =====================================================
+   PASSWORD INPUT
+===================================================== */
+
+#reg-password,
+#login-password {
+  width: 100%;
+
+  padding: 11px 14px;
+
+  border: 1.5px solid var(--border);
+
+  border-radius: 10px;
+
+  background: var(--surface);
+
+  color: var(--text);
+
+  font-size: 15px;
+
+  outline: none;
+
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+
+#reg-password:focus,
+#login-password:focus {
+  border-color: var(--green);
+
+  box-shadow:
+    0 0 0 3px
+    rgba(37, 211, 102, 0.10);
+}
+
+
+#reg-password::placeholder,
+#login-password::placeholder {
+  color: var(--hint);
+}
+
+
+/* =====================================================
+   AUTH CARD
+===================================================== */
+
+#register-form,
+#login-form {
+  width: 100%;
+}
+
+
+#register-form h2,
+#login-form h2 {
+  font-size: 22px;
+
+  font-weight: 700;
+
+  margin-bottom: 6px;
+}
+
+
+/* =====================================================
+   STATUS
+===================================================== */
+
+.chat-contact-status {
+  min-height: 17px;
+
+  font-size: 12px;
+
+  color: var(--muted);
+
+  transition: color 0.15s;
+}
+
+
+/*
+  app.js changes text:
+
+  online
+  typing...
+  offline
+  last seen today at ...
+*/
+
+
+/* =====================================================
+   SPEAKER
+
+   No .active class initially means OFF.
+
+   app.js / rtc.js will add .active only after user
+   clicks speaker.
+===================================================== */
+
+#btn-spk:not(.active) {
+  background:
+    rgba(255, 255, 255, 0.15);
+
+  color: #fff;
+}
+
+
+#btn-spk.active {
+  background:
+    rgba(255, 255, 255, 0.92);
+
+  color: #111;
+}
+
+
+/* =====================================================
+   AUTH MOBILE
+===================================================== */
+
+@media (max-width: 768px) {
+
+  #screen-register {
+    padding: 16px;
+  }
+
+
+  .auth-card {
+    width: 100%;
+
+    max-width: 420px;
+
+    padding: 32px 24px;
+  }
+
+
+  .auth-switch {
+    margin-top: 18px;
+  }
+
+}
+
+
+@media (max-width: 400px) {
+
+  #screen-register {
+    padding: 12px;
+  }
+
+
+  .auth-card {
+    padding: 28px 18px;
+
+    border-radius: 16px;
+  }
+
+
+  #register-form h2,
+  #login-form h2 {
+    font-size: 20px;
+  }
+
+
+  .auth-switch {
+    font-size: 12px;
+  }
+
+
+  .auth-link {
+    font-size: 12px;
+  }
+
+}
+
+
+
+
+/* =====================================================
+   MESSAGE EDIT / DELETE
+===================================================== */
+
+.bubble-wrap {
+  position: relative;
+}
+
+.bubble {
+  position: relative;
+}
+
+.message-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.message-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  margin-left: 8px;
+}
+
+.edited-label {
+  font-size: 10px;
+  opacity: 0.65;
+  font-style: italic;
+}
+
+.message-menu-btn {
+  position: absolute;
+
+  top: 3px;
+  right: -28px;
+
+  width: 26px;
+  height: 26px;
+
+  border: none;
+  border-radius: 50%;
+
+  background: transparent;
+
+  color: #667781;
+
+  font-size: 20px;
+  line-height: 20px;
+
+  cursor: pointer;
+
+  opacity: 0;
+
+  transition:
+    opacity 0.15s,
+    background 0.15s;
+}
+
+.bubble-wrap.mine:hover
+.message-menu-btn {
+  opacity: 1;
+}
+
+.message-menu-btn:hover {
+  background:
+    rgba(0, 0, 0, 0.06);
+}
+
+.message-menu {
+  position: absolute;
+
+  top: 28px;
+  right: -5px;
+
+  min-width: 120px;
+
+  padding: 6px;
+
+  background: white;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+
+  box-shadow:
+    0 5px 20px
+    rgba(0, 0, 0, 0.15);
+
+  z-index: 50;
+}
+
+.message-menu.hidden {
+  display: none;
+}
+
+.message-menu button {
+  display: block;
+
+  width: 100%;
+
+  padding: 9px 12px;
+
+  border: none;
+  border-radius: 7px;
+
+  background: transparent;
+
+  text-align: left;
+
+  font-size: 13px;
+
+  cursor: pointer;
+}
+
+.message-menu button:hover {
+  background: #f3f4f6;
+}
+
+.message-menu
+.delete-option {
+  color: #dc2626;
+}
+
+
+/* Mobile: always show dots */
+
+@media (max-width: 768px) {
+
+  .message-menu-btn {
+    opacity: 1;
+  }
+
+}

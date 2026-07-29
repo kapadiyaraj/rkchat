@@ -1,614 +1,3539 @@
-// FriendCall — main app logic
-const socket = io();
-const rtc = new RTC(socket);
+// ======================================================
+// FriendCall — Main Application
+// ======================================================
 
-// ── State ──
-let me = null;          // { phone, username }
-let contacts = {};      // phone -> { phone, username, messages:[], unread:0, lastMsg:'', lastTime:'' }
+let socket = null;
+let rtc = null;
+
+let me = null;
+
+let contacts = {};
+
 let activePhone = null;
-let pendingCall = null; // { fromPhone, fromName, offer, callType }
-let typingTimers = {};
+
+let pendingCall = null;
+
 let myTyping = false;
 let myTypingTimer = null;
 
-const ringtone = new Audio("/sounds/ringtone.mp3");
+let socketEventsBound = false;
+
+
+// ======================================================
+// RINGTONE
+// ======================================================
+
+const ringtone =
+  new Audio(
+    "/sounds/ringtone.mp3"
+  );
+
 ringtone.loop = true;
 
-// ── Avatar colors ──
+
+// ======================================================
+// AVATAR
+// ======================================================
+
 const COLORS = [
-  ["#dbeafe","#1e40af"], ["#dcfce7","#166534"], ["#fce7f3","#9d174d"],
-  ["#fef3c7","#92400e"], ["#ede9fe","#5b21b6"], ["#fee2e2","#991b1b"],
-  ["#e0f2fe","#0c4a6e"], ["#d1fae5","#065f46"],
+  ["#dbeafe", "#1e40af"],
+  ["#dcfce7", "#166534"],
+  ["#fce7f3", "#9d174d"],
+  ["#fef3c7", "#92400e"],
+  ["#ede9fe", "#5b21b6"],
+  ["#fee2e2", "#991b1b"],
+  ["#e0f2fe", "#0c4a6e"],
+  ["#d1fae5", "#065f46"],
 ];
-function avatarColor(phone) { return COLORS[(+phone[phone.length - 1]) % COLORS.length]; }
-function initials(name) { return name.trim().split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2); }
-function setAvatar(el, name, phone, size = 44) {
-  const [bg, color] = avatarColor(phone);
-  el.style.background = bg;
-  el.style.color = color;
-  el.style.width = size + "px";
-  el.style.height = size + "px";
-  el.textContent = initials(name);
+
+function avatarColor(phone) {
+  const value =
+    Number(
+      phone?.[
+        phone.length - 1
+      ]
+    ) || 0;
+
+  return COLORS[
+    value % COLORS.length
+  ];
 }
 
-// ─────────────────────────────────────────
-// REGISTER & AUTO-LOGIN
-// ─────────────────────────────────────────
-document.getElementById("reg-btn").addEventListener("click", doRegister);
-document.getElementById("reg-name").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("reg-phone").focus(); });
-document.getElementById("reg-phone").addEventListener("keydown", e => { if (e.key === "Enter") doRegister(); });
+function initials(name) {
+  return String(name || "?")
+    .trim()
+    .split(/\s+/)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
 
-function doRegister() {
-  const name  = document.getElementById("reg-name").value.trim();
-  const phone = document.getElementById("reg-phone").value.trim().replace(/\D/g, "");
-  if (!name)           { shake(document.getElementById("reg-name"));  return; }
-  if (phone.length < 10) { shake(document.getElementById("reg-phone")); return; }
+function setAvatar(
+  element,
+  name,
+  phone,
+  size = 44
+) {
+  if (!element) return;
 
-  socket.emit("register", { phone, username: name });
+  const [background, color] =
+    avatarColor(phone);
 
-  socket.once("registered", () => {
-    me = { phone, username: name };
-    localStorage.setItem("me", JSON.stringify(me));
-    initApp();
+  element.style.background =
+    background;
+
+  element.style.color =
+    color;
+
+  element.style.width =
+    size + "px";
+
+  element.style.height =
+    size + "px";
+
+  element.textContent =
+    initials(name);
+}
+
+
+// ======================================================
+// AUTH ELEMENTS
+// ======================================================
+
+const registerForm =
+  document.getElementById(
+    "register-form"
+  );
+
+const loginForm =
+  document.getElementById(
+    "login-form"
+  );
+
+
+const clearChatBtn =
+  document.getElementById("clear-chat-btn");
+
+clearChatBtn?.addEventListener("click", () => {
+  if (!socket || !activePhone) {
+    return;
+  }
+
+  const contact = contacts[activePhone];
+
+  if (!contact) {
+    return;
+  }
+
+  const confirmed = confirm(
+    `Clear chat with ${contact.username}?\n\nThis will permanently delete all messages for both users.`
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  socket.emit("clear-chat", {
+    otherPhone: activePhone,
   });
+});
+
+// ======================================================
+// SHOW LOGIN
+// ======================================================
+
+document
+  .getElementById(
+    "show-login-btn"
+  )
+  ?.addEventListener(
+    "click",
+    () => {
+      registerForm?.classList.add(
+        "hidden"
+      );
+
+      loginForm?.classList.remove(
+        "hidden"
+      );
+    }
+  );
+
+
+// ======================================================
+// SHOW REGISTER
+// ======================================================
+
+document
+  .getElementById(
+    "show-register-btn"
+  )
+  ?.addEventListener(
+    "click",
+    () => {
+      loginForm?.classList.add(
+        "hidden"
+      );
+
+      registerForm?.classList.remove(
+        "hidden"
+      );
+    }
+  );
+
+
+// ======================================================
+// REGISTER
+// ======================================================
+
+document
+  .getElementById("reg-btn")
+  ?.addEventListener(
+    "click",
+    doRegister
+  );
+
+
+async function doRegister() {
+  const username =
+    document
+      .getElementById(
+        "reg-name"
+      )
+      .value.trim();
+
+  const phone =
+    document
+      .getElementById(
+        "reg-phone"
+      )
+      .value.replace(
+        /\D/g,
+        ""
+      );
+
+  const password =
+    document.getElementById(
+      "reg-password"
+    ).value;
+
+  const error =
+    document.getElementById(
+      "register-error"
+    );
+
+  if (error) {
+    error.textContent = "";
+  }
+
+  if (!username) {
+    showRegisterError(
+      "Enter your name."
+    );
+
+    return;
+  }
+
+  if (phone.length !== 10) {
+    showRegisterError(
+      "Enter a valid 10-digit mobile number."
+    );
+
+    return;
+  }
+
+  if (password.length < 6) {
+    showRegisterError(
+      "Password must be at least 6 characters."
+    );
+
+    return;
+  }
+
+  try {
+    const response =
+      await fetch(
+        "/api/auth/register",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify({
+            username,
+            phone,
+            password,
+          }),
+        }
+      );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message ||
+          "Registration failed."
+      );
+    }
+
+    localStorage.setItem(
+      "friendcall_token",
+      data.token
+    );
+
+    me = data.user;
+
+    startAuthenticatedApp();
+  } catch (err) {
+    showRegisterError(
+      err.message
+    );
+  }
 }
+
+
+function showRegisterError(
+  message
+) {
+  const error =
+    document.getElementById(
+      "register-error"
+    );
+
+  if (error) {
+    error.textContent =
+      message;
+  }
+}
+
+
+// ======================================================
+// LOGIN
+// ======================================================
+
+document
+  .getElementById(
+    "login-btn"
+  )
+  ?.addEventListener(
+    "click",
+    doLogin
+  );
+
+
+async function doLogin() {
+  const phone =
+    document
+      .getElementById(
+        "login-phone"
+      )
+      .value.replace(
+        /\D/g,
+        ""
+      );
+
+  const password =
+    document.getElementById(
+      "login-password"
+    ).value;
+
+  const error =
+    document.getElementById(
+      "login-error"
+    );
+
+  if (error) {
+    error.textContent = "";
+  }
+
+  if (phone.length !== 10) {
+    showLoginError(
+      "Enter a valid 10-digit mobile number."
+    );
+
+    return;
+  }
+
+  if (!password) {
+    showLoginError(
+      "Enter your password."
+    );
+
+    return;
+  }
+
+  try {
+    const response =
+      await fetch(
+        "/api/auth/login",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify({
+            phone,
+            password,
+          }),
+        }
+      );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message ||
+          "Login failed."
+      );
+    }
+
+    localStorage.setItem(
+      "friendcall_token",
+      data.token
+    );
+
+    me = data.user;
+
+    startAuthenticatedApp();
+  } catch (err) {
+    showLoginError(
+      err.message
+    );
+  }
+}
+
+
+function showLoginError(
+  message
+) {
+  const error =
+    document.getElementById(
+      "login-error"
+    );
+
+  if (error) {
+    error.textContent =
+      message;
+  }
+}
+
+
+// ======================================================
+// ENTER KEY AUTH
+// ======================================================
+
+document
+  .getElementById(
+    "reg-name"
+  )
+  ?.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event.key === "Enter"
+      ) {
+        document
+          .getElementById(
+            "reg-phone"
+          )
+          ?.focus();
+      }
+    }
+  );
+
+
+document
+  .getElementById(
+    "reg-phone"
+  )
+  ?.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event.key === "Enter"
+      ) {
+        document
+          .getElementById(
+            "reg-password"
+          )
+          ?.focus();
+      }
+    }
+  );
+
+
+document
+  .getElementById(
+    "reg-password"
+  )
+  ?.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event.key === "Enter"
+      ) {
+        doRegister();
+      }
+    }
+  );
+
+
+document
+  .getElementById(
+    "login-phone"
+  )
+  ?.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event.key === "Enter"
+      ) {
+        document
+          .getElementById(
+            "login-password"
+          )
+          ?.focus();
+      }
+    }
+  );
+
+
+document
+  .getElementById(
+    "login-password"
+  )
+  ?.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event.key === "Enter"
+      ) {
+        doLogin();
+      }
+    }
+  );
+
+
+// ======================================================
+// PERSISTENT LOGIN
+// ======================================================
+
+window.addEventListener(
+  "load",
+  async () => {
+    const token =
+      localStorage.getItem(
+        "friendcall_token"
+      );
+
+    if (!token) {
+      return;
+    }
+
+    try {
+      const response =
+        await fetch(
+          "/api/auth/me",
+          {
+            headers: {
+              Authorization:
+                `Bearer ${token}`,
+            },
+          }
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          "Invalid session"
+        );
+      }
+
+      const data =
+        await response.json();
+
+      me = data.user;
+
+      startAuthenticatedApp();
+    } catch {
+      localStorage.removeItem(
+        "friendcall_token"
+      );
+    }
+  }
+);
+
+
+// ======================================================
+// START AUTHENTICATED APP
+// ======================================================
+
+function startAuthenticatedApp() {
+  if (!me) return;
+
+  if (
+    socket &&
+    socket.connected
+  ) {
+    initApp();
+    return;
+  }
+
+  const token =
+    localStorage.getItem(
+      "friendcall_token"
+    );
+
+  if (!token) return;
+
+  socket = io({
+    auth: {
+      token,
+    },
+  });
+
+  rtc =
+    new RTC(socket);
+
+  bindSocketEvents();
+
+  socket.on(
+    "connect",
+    () => {
+      console.log(
+        "Socket connected:",
+        socket.id
+      );
+
+      initApp();
+    }
+  );
+
+  socket.on(
+    "connect_error",
+    (err) => {
+      console.error(
+        "Socket error:",
+        err.message
+      );
+
+      if (
+        err.message ===
+          "Authentication required" ||
+        err.message ===
+          "Invalid authentication"
+      ) {
+        localStorage.removeItem(
+          "friendcall_token"
+        );
+
+        location.reload();
+      }
+    }
+  );
+}
+
+
+// ======================================================
+// INIT APP
+// ======================================================
 
 function initApp() {
-  document.getElementById("my-name").textContent  = me.username;
-  document.getElementById("my-phone").textContent = "+91 " + me.phone;
-  setAvatar(document.getElementById("my-avatar"), me.username, me.phone);
+  if (!me || !socket) {
+    return;
+  }
 
-  // મોંગો ડેટાબેઝમાંથી સેવ કરેલા કોન્ટેક્ટ્સ લાવવા માટે બેકએન્ડને રિક્વેસ્ટ મોકલો
-  socket.emit("load-contacts", { phone: me.phone });
+  const myName =
+    document.getElementById(
+      "my-name"
+    );
 
-  loadSavedContacts(); // લોકલ સ્ટોરેજ બેકઅપ
+  const myPhone =
+    document.getElementById(
+      "my-phone"
+    );
 
-  document.getElementById("screen-register").classList.remove("active");
-  document.getElementById("screen-app").classList.add("active");
+  if (myName) {
+    myName.textContent =
+      me.username;
+  }
+
+  if (myPhone) {
+    myPhone.textContent =
+      "+91 " + me.phone;
+  }
+
+  setAvatar(
+    document.getElementById(
+      "my-avatar"
+    ),
+    me.username,
+    me.phone
+  );
+
+  loadSavedContacts();
+
+  socket.emit(
+    "load-contacts"
+  );
+
+  document
+    .getElementById(
+      "screen-register"
+    )
+    ?.classList.remove(
+      "active"
+    );
+
+  document
+    .getElementById(
+      "screen-app"
+    )
+    ?.classList.add(
+      "active"
+    );
 }
 
-window.addEventListener("load", () => {
-  const saved = localStorage.getItem("me");
-  if (!saved) return;
-  me = JSON.parse(saved);
 
-  if (socket.connected) {
-    socket.emit("register", { phone: me.phone, username: me.username });
-    initApp();
-  } else {
-    socket.once("connect", () => {
-      socket.emit("register", { phone: me.phone, username: me.username });
-      initApp();
-    });
-  }
-});
+// ======================================================
+// LOCAL CONTACT STORAGE
+// ======================================================
 
-// સર્વર પરથી મોંગોના કોન્ટેક્ટ્સ લોડ થાય ત્યારે UI અપડેટ (ગ્લોબલ સ્કોપમાં સેટ કરેલું છે)
-socket.on("contacts-loaded", (savedContacts) => {
-  contacts = {};
-  document.getElementById("contacts-list").innerHTML = "";
-
-  savedContacts.forEach(contact => {
-    contacts[contact.phone] = {
-      phone: contact.phone,
-      username: contact.username,
-      online: false,
-      messages: [],
-      unread: 0,
-      lastMsg: "",
-      lastTime: ""
-    };
-    renderContactItem(contacts[contact.phone]);
-  });
-  updateEmptyState();
-});
-
-// ─────────────────────────────────────────
-// CONTACTS — LOCAL STORAGE & MODAL
-// ─────────────────────────────────────────
 function loadSavedContacts() {
-  const saved = localStorage.getItem("contacts_" + me.phone);
-  if (saved) {
-    contacts = JSON.parse(saved);
-    Object.values(contacts).forEach(c => renderContactItem(c));
+  if (!me) return;
+
+  const saved =
+    localStorage.getItem(
+      "contacts_" + me.phone
+    );
+
+  if (!saved) {
+    updateEmptyState();
+    return;
   }
-  updateEmptyState();
+
+  try {
+    contacts =
+      JSON.parse(saved);
+
+    const list =
+      document.getElementById(
+        "contacts-list"
+      );
+
+    if (list) {
+      list.innerHTML = "";
+    }
+
+    Object.values(
+      contacts
+    ).forEach(
+      (contact) => {
+        renderContactItem(
+          contact
+        );
+      }
+    );
+
+    updateEmptyState();
+  } catch {
+    contacts = {};
+  }
 }
+
+
 function saveContacts() {
-  localStorage.setItem("contacts_" + me.phone, JSON.stringify(contacts));
+  if (!me) return;
+
+  localStorage.setItem(
+    "contacts_" + me.phone,
+    JSON.stringify(
+      contacts
+    )
+  );
 }
 
-document.getElementById("add-contact-btn").addEventListener("click", () => {
-  document.getElementById("add-phone-input").value = "";
-  document.getElementById("add-result").className  = "add-result";
-  document.getElementById("add-result").textContent = "";
-  document.getElementById("search-btn").textContent = "Search";
-  document.getElementById("search-btn").onclick = searchContact;
-  document.getElementById("modal-add").classList.remove("hidden");
-  setTimeout(() => document.getElementById("add-phone-input").focus(), 100);
+
+// ======================================================
+// SOCKET EVENTS
+// ======================================================
+
+function bindSocketEvents() {
+  if (
+    !socket ||
+    socketEventsBound
+  ) {
+    return;
+  }
+
+  socketEventsBound = true;
+
+
+  // ====================================================
+  // CONTACTS LOADED
+  // ====================================================
+
+  socket.on(
+    "contacts-loaded",
+    (savedContacts) => {
+      const oldContacts =
+        contacts;
+
+      contacts = {};
+
+      const list =
+        document.getElementById(
+          "contacts-list"
+        );
+
+      if (list) {
+        list.innerHTML = "";
+      }
+
+      savedContacts.forEach(
+        (contact) => {
+          const old =
+            oldContacts[
+              contact.phone
+            ] || {};
+
+          contacts[
+            contact.phone
+          ] = {
+            phone:
+              contact.phone,
+
+            username:
+              contact.username,
+
+            online:
+              Boolean(
+                contact.online
+              ),
+
+            lastSeen:
+              contact.lastSeen ||
+              old.lastSeen ||
+              null,
+
+            messages:
+              old.messages || [],
+
+            unread:
+              old.unread || 0,
+
+            lastMsg:
+              old.lastMsg || "",
+
+            lastTime:
+              old.lastTime || "",
+          };
+
+          renderContactItem(
+            contacts[
+              contact.phone
+            ]
+          );
+        }
+      );
+
+      saveContacts();
+      updateEmptyState();
+
+      if (
+        activePhone &&
+        contacts[
+          activePhone
+        ]
+      ) {
+        showNormalStatus(
+          activePhone
+        );
+      }
+    }
+  );
+
+
+  // ====================================================
+  // CONTACT FOUND
+  // ====================================================
+
+  socket.on(
+    "contact-found",
+    (contact) => {
+      const result =
+        document.getElementById(
+          "add-result"
+        );
+
+      if (!result) return;
+
+      if (
+        contact.phone ===
+        me.phone
+      ) {
+        result.className =
+          "add-result err";
+
+        result.textContent =
+          "You cannot add yourself.";
+
+        return;
+      }
+
+      if (
+        contacts[
+          contact.phone
+        ]
+      ) {
+        result.className =
+          "add-result err";
+
+        result.textContent =
+          contact.username +
+          " is already in your contacts.";
+
+        return;
+      }
+
+      result.className =
+        "add-result ok";
+
+      result.textContent =
+        `Found: ${contact.username} (+91 ${contact.phone})`;
+
+      const searchButton =
+        document.getElementById(
+          "search-btn"
+        );
+
+      searchButton.textContent =
+        "Add Contact";
+
+      searchButton.onclick =
+        () => {
+          addContact(
+            contact
+          );
+
+          document
+            .getElementById(
+              "modal-add"
+            )
+            ?.classList.add(
+              "hidden"
+            );
+
+          searchButton.textContent =
+            "Search";
+
+          searchButton.onclick =
+            searchContact;
+        };
+    }
+  );
+
+
+  // ====================================================
+  // CONTACT ERROR
+  // ====================================================
+
+  socket.on(
+    "contact-error",
+    (message) => {
+      const result =
+        document.getElementById(
+          "add-result"
+        );
+
+      if (!result) return;
+
+      result.className =
+        "add-result err";
+
+      result.textContent =
+        message;
+    }
+  );
+
+// ====================================================
+// CHAT CLEARED
+// ====================================================
+
+socket.on("chat-cleared", ({ otherPhone }) => {
+  const contact = contacts[otherPhone];
+
+  if (contact) {
+    // Clear local cached chat data
+    contact.messages = [];
+    contact.lastMsg = "";
+    contact.lastTime = "";
+    contact.unread = 0;
+
+    saveContacts();
+
+    // Reset contact list preview
+    const last =
+      document.getElementById("last_" + otherPhone);
+
+    const time =
+      document.getElementById("time_" + otherPhone);
+
+    const badge =
+      document.getElementById("badge_" + otherPhone);
+
+    if (last) {
+      last.textContent = "+91 " + otherPhone;
+    }
+
+    if (time) {
+      time.textContent = "";
+    }
+
+    if (badge) {
+      badge.textContent = "";
+      badge.style.display = "none";
+    }
+  }
+
+  // Clear visible chat if this conversation is open
+  if (activePhone === otherPhone) {
+    const messagesContainer =
+      document.getElementById("messages");
+
+    if (messagesContainer) {
+      messagesContainer.innerHTML = "";
+    }
+  }
 });
 
-document.getElementById("cancel-add-btn").addEventListener("click", () => {
-  document.getElementById("modal-add").classList.add("hidden");
-});
+socket.on(
+  "message-history",
+  (messages) => {
+    const messagesElement =
+      document.getElementById(
+        "messages"
+      );
 
-document.getElementById("search-btn").addEventListener("click", searchContact);
-document.getElementById("add-phone-input").addEventListener("keydown", e => { if (e.key === "Enter") searchContact(); });
+    if (!messagesElement) return;
+
+    messagesElement.innerHTML = "";
+
+    messages.forEach((message) => {
+
+      appendBubble(
+        {
+          id:
+            message._id,
+
+          from:
+            message.fromPhone === me.phone
+              ? "me"
+              : "them",
+
+          text:
+            message.message,
+
+          timestamp:
+            message.timestamp,
+
+          edited:
+            Boolean(message.edited),
+        },
+
+        false
+      );
+    });
+
+    messagesElement.scrollTop =
+      messagesElement.scrollHeight;
+  }
+);
+
+socket.on(
+  "message-sent",
+  ({
+    messageId,
+    toPhone,
+    message,
+    timestamp,
+    edited,
+  }) => {
+
+    if (!contacts[toPhone]) {
+      return;
+    }
+
+    const msg = {
+      id: messageId,
+      from: "me",
+      text: message,
+      timestamp,
+      edited: Boolean(edited),
+    };
+
+    contacts[toPhone].messages.push(msg);
+
+    contacts[toPhone].lastMsg =
+      message;
+
+    contacts[toPhone].lastTime =
+      timestamp;
+
+    saveContacts();
+
+    if (activePhone === toPhone) {
+      appendBubble(msg, true);
+    }
+
+    updateLastMsg(
+      toPhone,
+      message,
+      timestamp
+    );
+  }
+);
+
+
+// ====================================================
+// MESSAGE EDITED
+// ====================================================
+
+socket.on(
+  "message-edited",
+  ({
+    messageId,
+    fromPhone,
+    toPhone,
+    message,
+  }) => {
+
+    const otherPhone =
+      fromPhone === me.phone
+        ? toPhone
+        : fromPhone;
+
+    const contact =
+      contacts[otherPhone];
+
+    if (contact) {
+
+      const savedMessage =
+        contact.messages.find(
+          (msg) =>
+            msg.id === messageId
+        );
+
+      if (savedMessage) {
+        savedMessage.text =
+          message;
+
+        savedMessage.edited =
+          true;
+      }
+
+      // If edited message is latest
+      const last =
+        contact.messages[
+          contact.messages.length - 1
+        ];
+
+      if (
+        last &&
+        last.id === messageId
+      ) {
+        contact.lastMsg =
+          message;
+
+        updateLastMsg(
+          otherPhone,
+          message,
+          contact.lastTime
+        );
+      }
+
+      saveContacts();
+    }
+
+
+    // Update visible bubble
+    const wrapper =
+      document.querySelector(
+        `[data-message-id="${messageId}"]`
+      );
+
+    if (wrapper) {
+
+      const text =
+        wrapper.querySelector(
+          ".message-text"
+        );
+
+      if (text) {
+        text.textContent =
+          message;
+      }
+
+
+      let edited =
+        wrapper.querySelector(
+          ".edited-label"
+        );
+
+      if (!edited) {
+
+        edited =
+          document.createElement(
+            "span"
+          );
+
+        edited.className =
+          "edited-label";
+
+        edited.textContent =
+          "edited";
+
+        const meta =
+          wrapper.querySelector(
+            ".message-meta"
+          );
+
+        if (meta) {
+          meta.prepend(
+            edited
+          );
+        }
+      }
+    }
+  }
+);
+
+
+// ====================================================
+// MESSAGE DELETED
+// ====================================================
+
+socket.on(
+  "message-deleted",
+  ({
+    messageId,
+    fromPhone,
+    toPhone,
+  }) => {
+
+    const otherPhone =
+      fromPhone === me.phone
+        ? toPhone
+        : fromPhone;
+
+    const contact =
+      contacts[otherPhone];
+
+
+    if (contact) {
+
+      contact.messages =
+        contact.messages.filter(
+          (msg) =>
+            msg.id !== messageId
+        );
+
+
+      const lastMessage =
+        contact.messages[
+          contact.messages.length - 1
+        ];
+
+
+      if (lastMessage) {
+
+        contact.lastMsg =
+          lastMessage.text;
+
+        contact.lastTime =
+          lastMessage.timestamp;
+
+        updateLastMsg(
+          otherPhone,
+          lastMessage.text,
+          lastMessage.timestamp
+        );
+
+      } else {
+
+        contact.lastMsg = "";
+        contact.lastTime = "";
+
+        const last =
+          document.getElementById(
+            "last_" + otherPhone
+          );
+
+        const time =
+          document.getElementById(
+            "time_" + otherPhone
+          );
+
+        if (last) {
+          last.textContent =
+            "+91 " + otherPhone;
+        }
+
+        if (time) {
+          time.textContent = "";
+        }
+      }
+
+      saveContacts();
+    }
+
+
+    // Remove visible bubble
+    document
+      .querySelector(
+        `[data-message-id="${messageId}"]`
+      )
+      ?.remove();
+  }
+);
+
+
+// ====================================================
+// MESSAGE ACTION ERROR
+// ====================================================
+
+socket.on(
+  "message-action-error",
+  (message) => {
+    alert(message);
+  }
+);
+
+  // ====================================================
+  // RECEIVE MESSAGE
+  // ====================================================
+
+  socket.on(
+    "receive-message",
+    ({
+       messageId,
+    fromPhone,
+    fromName,
+    message,
+    timestamp,
+    edited,
+    }) => {
+      if (
+        !contacts[
+          fromPhone
+        ]
+      ) {
+        contacts[
+          fromPhone
+        ] = {
+          phone:
+            fromPhone,
+
+          username:
+            fromName,
+
+          online:
+            true,
+
+          lastSeen:
+            null,
+
+          messages:
+            [],
+
+          unread:
+            0,
+
+          lastMsg:
+            "",
+
+          lastTime:
+            "",
+        };
+
+        renderContactItem(
+          contacts[
+            fromPhone
+          ]
+        );
+      }
+
+      const msg = {
+      id: messageId,
+  from: "them",
+  text: message,
+  timestamp,
+  edited: Boolean(edited),
+      };
+
+      contacts[
+        fromPhone
+      ].messages.push(msg);
+
+      contacts[
+        fromPhone
+      ].lastMsg =
+        message;
+
+      contacts[
+        fromPhone
+      ].lastTime =
+        timestamp;
+
+      if (
+        activePhone ===
+        fromPhone
+      ) {
+        appendBubble(
+          msg,
+          true
+        );
+      } else {
+        contacts[
+          fromPhone
+        ].unread++;
+
+        const badge =
+          document.getElementById(
+            "badge_" +
+              fromPhone
+          );
+
+        if (badge) {
+          badge.style.display =
+            "flex";
+
+          badge.textContent =
+            contacts[
+              fromPhone
+            ].unread;
+        }
+      }
+
+      updateLastMsg(
+        fromPhone,
+        message,
+        timestamp
+      );
+
+      saveContacts();
+
+      const item =
+        document.querySelector(
+          `.contact-item[data-phone="${fromPhone}"]`
+        );
+
+      if (item) {
+        document
+          .getElementById(
+            "contacts-list"
+          )
+          ?.prepend(item);
+      }
+    }
+  );
+
+
+  // ====================================================
+  // TYPING
+  // WhatsApp style:
+  // typing... replaces online
+  // ====================================================
+
+  socket.on(
+    "typing",
+    ({
+      fromPhone,
+      isTyping,
+    }) => {
+      if (
+        fromPhone !==
+        activePhone
+      ) {
+        return;
+      }
+
+      const status =
+        document.getElementById(
+          "chat-contact-status"
+        );
+
+      if (!status) return;
+
+      if (isTyping) {
+        status.textContent =
+          "typing...";
+      } else {
+        showNormalStatus(
+          fromPhone
+        );
+      }
+    }
+  );
+
+
+  // ====================================================
+  // ONLINE
+  // ====================================================
+
+  socket.on(
+    "user-online",
+    ({ phone }) => {
+      if (
+        !contacts[phone]
+      ) {
+        return;
+      }
+
+      contacts[
+        phone
+      ].online = true;
+
+      contacts[
+        phone
+      ].lastSeen = null;
+
+      const dot =
+        document.getElementById(
+          "dot_" + phone
+        );
+
+      if (dot) {
+        dot.style.display =
+          "block";
+      }
+
+      showNormalStatus(
+        phone
+      );
+
+      saveContacts();
+    }
+  );
+
+
+  // ====================================================
+  // OFFLINE / LAST SEEN
+  // ====================================================
+
+  socket.on(
+    "user-offline",
+    ({
+      phone,
+      lastSeen,
+    }) => {
+      if (
+        !contacts[phone]
+      ) {
+        return;
+      }
+
+      contacts[
+        phone
+      ].online = false;
+
+      contacts[
+        phone
+      ].lastSeen =
+        lastSeen;
+
+      const dot =
+        document.getElementById(
+          "dot_" + phone
+        );
+
+      if (dot) {
+        dot.style.display =
+          "none";
+      }
+
+      showNormalStatus(
+        phone
+      );
+
+      saveContacts();
+    }
+  );
+
+
+  // ====================================================
+  // INCOMING CALL
+  // ====================================================
+
+  socket.on(
+    "incoming-call",
+    ({
+      fromPhone,
+      fromName,
+      offer,
+      callType,
+    }) => {
+      ringtone
+        .play()
+        .catch(() => {});
+
+      pendingCall = {
+        fromPhone,
+        fromName,
+        offer,
+        callType,
+      };
+
+      if (
+        !contacts[
+          fromPhone
+        ]
+      ) {
+        contacts[
+          fromPhone
+        ] = {
+          phone:
+            fromPhone,
+
+          username:
+            fromName,
+
+          online:
+            true,
+
+          lastSeen:
+            null,
+
+          messages:
+            [],
+
+          unread:
+            0,
+
+          lastMsg:
+            "",
+
+          lastTime:
+            "",
+        };
+
+        renderContactItem(
+          contacts[
+            fromPhone
+          ]
+        );
+
+        saveContacts();
+      }
+
+      const name =
+        document.getElementById(
+          "inc-name"
+        );
+
+      const type =
+        document.getElementById(
+          "inc-type"
+        );
+
+      if (name) {
+        name.textContent =
+          fromName;
+      }
+
+      if (type) {
+        type.textContent =
+          callType === "video"
+            ? "Incoming video call..."
+            : "Incoming voice call...";
+      }
+
+      setAvatar(
+        document.getElementById(
+          "inc-avatar"
+        ),
+        fromName,
+        fromPhone,
+        72
+      );
+
+      document
+        .getElementById(
+          "modal-call"
+        )
+        ?.classList.remove(
+          "hidden"
+        );
+    }
+  );
+
+
+  // ====================================================
+  // CALL REJECTED
+  // ====================================================
+
+  socket.on(
+    "call-rejected",
+    () => {
+      stopRingtone();
+      closeCallOverlay();
+    }
+  );
+
+
+  // ====================================================
+  // CALL ENDED
+  // ====================================================
+
+  socket.on(
+    "call-ended",
+    () => {
+      stopRingtone();
+      closeCallOverlay();
+    }
+  );
+}
+
+
+// ======================================================
+// ADD CONTACT MODAL
+// ======================================================
+
+document
+  .getElementById(
+    "add-contact-btn"
+  )
+  ?.addEventListener(
+    "click",
+    () => {
+      const input =
+        document.getElementById(
+          "add-phone-input"
+        );
+
+      const result =
+        document.getElementById(
+          "add-result"
+        );
+
+      const searchButton =
+        document.getElementById(
+          "search-btn"
+        );
+
+      if (input) {
+        input.value = "";
+      }
+
+      if (result) {
+        result.className =
+          "add-result";
+
+        result.textContent =
+          "";
+      }
+
+      if (searchButton) {
+        searchButton.textContent =
+          "Search";
+
+        searchButton.onclick =
+          searchContact;
+      }
+
+      document
+        .getElementById(
+          "modal-add"
+        )
+        ?.classList.remove(
+          "hidden"
+        );
+
+      setTimeout(() => {
+        input?.focus();
+      }, 100);
+    }
+  );
+
+
+document
+  .getElementById(
+    "cancel-add-btn"
+  )
+  ?.addEventListener(
+    "click",
+    () => {
+      document
+        .getElementById(
+          "modal-add"
+        )
+        ?.classList.add(
+          "hidden"
+        );
+    }
+  );
+
+
+document
+  .getElementById(
+    "search-btn"
+  )
+  ?.addEventListener(
+    "click",
+    searchContact
+  );
+
+
+document
+  .getElementById(
+    "add-phone-input"
+  )
+  ?.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event.key === "Enter"
+      ) {
+        searchContact();
+      }
+    }
+  );
+
 
 function searchContact() {
-  const phone = document.getElementById("add-phone-input").value.trim().replace(/\D/g, "");
-  if (phone.length < 10) { shake(document.getElementById("add-phone-input")); return; }
-  socket.emit("find-contact", { phone });
+  if (!socket) return;
+
+  const phone =
+    document
+      .getElementById(
+        "add-phone-input"
+      )
+      .value.replace(
+        /\D/g,
+        ""
+      );
+
+  if (phone.length !== 10) {
+    shake(
+      document.getElementById(
+        "add-phone-input"
+      )
+    );
+
+    return;
+  }
+
+  socket.emit(
+    "find-contact",
+    {
+      phone,
+    }
+  );
 }
 
-socket.on("contact-found", (contact) => {
-  const res = document.getElementById("add-result");
 
-  if (contact.phone === me.phone) {
-    res.className = "add-result err";
-    res.textContent = "You cannot add yourself.";
+function addContact(
+  contact
+) {
+  if (
+    contacts[
+      contact.phone
+    ]
+  ) {
     return;
   }
-  if (contacts[contact.phone]) {
-    res.className = "add-result err";
-    res.textContent = contact.username + " is already in your contacts.";
-    return;
-  }
 
-  res.className = "add-result ok";
-  res.textContent = `Found: ${contact.username} (+91 ${contact.phone})`;
+  contacts[
+    contact.phone
+  ] = {
+    phone:
+      contact.phone,
 
-  const sb = document.getElementById("search-btn");
-  sb.textContent = "Add Contact";
-  sb.onclick = () => {
-    addContact(contact);
-    document.getElementById("modal-add").classList.add("hidden");
-    sb.textContent = "Search";
-    sb.onclick = searchContact;
+    username:
+      contact.username,
+
+    online:
+      Boolean(
+        contact.online
+      ),
+
+    lastSeen:
+      contact.lastSeen ||
+      null,
+
+    messages:
+      [],
+
+    unread:
+      0,
+
+    lastMsg:
+      "",
+
+    lastTime:
+      "",
   };
-});
 
-socket.on("contact-error", (msg) => {
-  const res = document.getElementById("add-result");
-  res.className = "add-result err";
-  res.textContent = msg;
-});
-
-function addContact(contact) {
-  contacts[contact.phone] = {
-    phone:    contact.phone,
-    username: contact.username,
-    online:   contact.online || false,
-    messages: [],
-    unread:   0,
-    lastMsg:  "",
-    lastTime: "",
-  };
   saveContacts();
-  
-  socket.emit("save-contact", {
-    ownerPhone: me.phone,
-    contactPhone: contact.phone,
-    contactName: contact.username
-  });
-  
-  renderContactItem(contacts[contact.phone]);
+
+  socket.emit(
+    "save-contact",
+    {
+      contactPhone:
+        contact.phone,
+
+      contactName:
+        contact.username,
+    }
+  );
+
+  renderContactItem(
+    contacts[
+      contact.phone
+    ]
+  );
+
   updateEmptyState();
 }
 
-function renderContactItem(contact) {
-  document.querySelector(`.contact-item[data-phone="${contact.phone}"]`)?.remove();
 
-  const li = document.createElement("li");
-  li.className = "contact-item";
-  li.dataset.phone = contact.phone;
+// ======================================================
+// RENDER CONTACT
+// ======================================================
 
-  const av = document.createElement("div");
-  av.className = "avatar";
-  setAvatar(av, contact.username, contact.phone);
+function renderContactItem(
+  contact
+) {
+  document
+    .querySelector(
+      `.contact-item[data-phone="${contact.phone}"]`
+    )
+    ?.remove();
 
-  const info = document.createElement("div");
-  info.className = "info";
-  const cname = document.createElement("div");
-  cname.className = "cname";
-  cname.textContent = contact.username;
-  const clast = document.createElement("div");
-  clast.className = "clast";
-  clast.id = "last_" + contact.phone;
-  clast.textContent = contact.lastMsg || "+91 " + contact.phone;
-  info.append(cname, clast);
+  const li =
+    document.createElement(
+      "li"
+    );
 
-  const meta = document.createElement("div");
-  meta.className = "cmeta";
+  li.className =
+    "contact-item";
 
-  const ctime = document.createElement("div");
-  ctime.className = "ctime";
-  ctime.id = "time_" + contact.phone;
-  ctime.textContent = contact.lastTime || "";
+  li.dataset.phone =
+    contact.phone;
 
-  const badge = document.createElement("div");
-  badge.className = "unread-badge";
-  badge.id = "badge_" + contact.phone;
-  badge.style.display = contact.unread > 0 ? "flex" : "none";
-  badge.textContent = contact.unread;
 
-  const dot = document.createElement("div");
-  dot.className = "online-dot";
-  dot.id = "dot_" + contact.phone;
-  dot.style.display = contact.online ? "block" : "none";
+  const avatar =
+    document.createElement(
+      "div"
+    );
 
-  meta.append(ctime, badge, dot);
-  li.append(av, info, meta);
-  li.addEventListener("click", () => openChat(contact.phone));
+  avatar.className =
+    "avatar";
 
-  const list = document.getElementById("contacts-list");
-  list.querySelector(".empty-contacts")?.remove();
-  list.prepend(li);
+  setAvatar(
+    avatar,
+    contact.username,
+    contact.phone
+  );
+
+
+  const info =
+    document.createElement(
+      "div"
+    );
+
+  info.className =
+    "info";
+
+
+  const name =
+    document.createElement(
+      "div"
+    );
+
+  name.className =
+    "cname";
+
+  name.textContent =
+    contact.username;
+
+
+  const last =
+    document.createElement(
+      "div"
+    );
+
+  last.className =
+    "clast";
+
+  last.id =
+    "last_" +
+    contact.phone;
+
+  last.textContent =
+    contact.lastMsg ||
+    "+91 " +
+      contact.phone;
+
+
+  info.append(
+    name,
+    last
+  );
+
+
+  const meta =
+    document.createElement(
+      "div"
+    );
+
+  meta.className =
+    "cmeta";
+
+
+  const time =
+    document.createElement(
+      "div"
+    );
+
+  time.className =
+    "ctime";
+
+  time.id =
+    "time_" +
+    contact.phone;
+
+  time.textContent =
+    contact.lastTime || "";
+
+
+  const badge =
+    document.createElement(
+      "div"
+    );
+
+  badge.className =
+    "unread-badge";
+
+  badge.id =
+    "badge_" +
+    contact.phone;
+
+  badge.style.display =
+    contact.unread > 0
+      ? "flex"
+      : "none";
+
+  badge.textContent =
+    contact.unread || "";
+
+
+  const dot =
+    document.createElement(
+      "div"
+    );
+
+  dot.className =
+    "online-dot";
+
+  dot.id =
+    "dot_" +
+    contact.phone;
+
+  dot.style.display =
+    contact.online
+      ? "block"
+      : "none";
+
+
+  meta.append(
+    time,
+    badge,
+    dot
+  );
+
+  li.append(
+    avatar,
+    info,
+    meta
+  );
+
+  li.addEventListener(
+    "click",
+    () => {
+      openChat(
+        contact.phone
+      );
+    }
+  );
+
+  const list =
+    document.getElementById(
+      "contacts-list"
+    );
+
+  list
+    ?.querySelector(
+      ".empty-contacts"
+    )
+    ?.remove();
+
+  list?.prepend(li);
 }
 
+
+// ======================================================
+// EMPTY CONTACTS
+// ======================================================
+
 function updateEmptyState() {
-  const list = document.getElementById("contacts-list");
-  if (Object.keys(contacts).length === 0 && !list.querySelector(".empty-contacts")) {
-    const li = document.createElement("li");
-    li.className = "empty-contacts";
-    li.innerHTML = `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5">
+  const list =
+    document.getElementById(
+      "contacts-list"
+    );
+
+  if (!list) return;
+
+  list
+    .querySelector(
+      ".empty-contacts"
+    )
+    ?.remove();
+
+  if (
+    Object.keys(
+      contacts
+    ).length !== 0
+  ) {
+    return;
+  }
+
+  const li =
+    document.createElement(
+      "li"
+    );
+
+  li.className =
+    "empty-contacts";
+
+  li.innerHTML = `
+    <svg
+      width="40"
+      height="40"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#ccc"
+      stroke-width="1.5"
+    >
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
       <circle cx="9" cy="7" r="4"/>
       <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
       <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-    </svg><p>No contacts yet.<br/>Click + to add a friend.</p>`;
-    list.appendChild(li);
-  }
+    </svg>
+
+    <p>
+      No contacts yet.<br>
+      Click + to add a friend.
+    </p>
+  `;
+
+  list.appendChild(li);
 }
 
-document.getElementById("search-input").addEventListener("input", function () {
-  const q = this.value.toLowerCase();
-  document.querySelectorAll(".contact-item").forEach(li => {
-    const name  = li.querySelector(".cname").textContent.toLowerCase();
-    const phone = li.dataset.phone;
-    li.style.display = (name.includes(q) || phone.includes(q)) ? "" : "none";
-  });
-});
 
-// ─────────────────────────────────────────
-// OPEN CHAT & MESSAGE HISTORY
-// ─────────────────────────────────────────
+// ======================================================
+// SEARCH CONTACT LIST
+// ======================================================
+
+document
+  .getElementById(
+    "search-input"
+  )
+  ?.addEventListener(
+    "input",
+    function () {
+      const query =
+        this.value
+          .toLowerCase()
+          .trim();
+
+      document
+        .querySelectorAll(
+          ".contact-item"
+        )
+        .forEach(
+          (item) => {
+            const name =
+              item
+                .querySelector(
+                  ".cname"
+                )
+                ?.textContent
+                .toLowerCase() ||
+              "";
+
+            const phone =
+              item.dataset.phone ||
+              "";
+
+            item.style.display =
+              name.includes(
+                query
+              ) ||
+              phone.includes(
+                query
+              )
+                ? ""
+                : "none";
+          }
+        );
+    }
+  );
+
+
+// ======================================================
+// OPEN CHAT
+// ======================================================
+
 function openChat(phone) {
-  activePhone = phone;
-  const contact = contacts[phone];
+  const contact =
+    contacts[phone];
 
-  document.querySelectorAll(".contact-item").forEach(li => li.classList.remove("active"));
-  document.querySelector(`.contact-item[data-phone="${phone}"]`)?.classList.add("active");
+  if (!contact) return;
+
+  activePhone = phone;
+
+  document
+    .querySelectorAll(
+      ".contact-item"
+    )
+    .forEach(
+      (item) => {
+        item.classList.remove(
+          "active"
+        );
+      }
+    );
+
+  document
+    .querySelector(
+      `.contact-item[data-phone="${phone}"]`
+    )
+    ?.classList.add(
+      "active"
+    );
 
   contact.unread = 0;
-  const badge = document.getElementById("badge_" + phone);
-  if (badge) badge.style.display = "none";
+
+  const badge =
+    document.getElementById(
+      "badge_" + phone
+    );
+
+  if (badge) {
+    badge.style.display =
+      "none";
+  }
+
   saveContacts();
 
-  document.getElementById("chat-area").classList.add("active-chat");
-  document.getElementById("chat-empty").classList.add("hidden");
-  document.getElementById("chat-header").classList.remove("hidden");
-  document.getElementById("messages").classList.remove("hidden");
-  document.getElementById("typing-bar").classList.remove("hidden");
-  document.getElementById("input-bar").classList.remove("hidden");
 
-  document.getElementById("chat-contact-name").textContent   = contact.username;
-  document.getElementById("chat-contact-status").textContent = contact.online ? "online" : "+91 " + contact.phone;
-  setAvatar(document.getElementById("chat-avatar"), contact.username, contact.phone, 38);
+  document
+    .getElementById(
+      "chat-area"
+    )
+    ?.classList.add(
+      "active-chat"
+    );
 
-  socket.emit("load-messages", { myPhone: me.phone, otherPhone: phone });
+  document
+    .getElementById(
+      "chat-empty"
+    )
+    ?.classList.add(
+      "hidden"
+    );
 
-  document.getElementById("msg-input").focus();
+  document
+    .getElementById(
+      "chat-header"
+    )
+    ?.classList.remove(
+      "hidden"
+    );
+
+  document
+    .getElementById(
+      "messages"
+    )
+    ?.classList.remove(
+      "hidden"
+    );
+
+  // Old typing bar no longer needed.
+  document
+    .getElementById(
+      "typing-bar"
+    )
+    ?.classList.add(
+      "hidden"
+    );
+
+  document
+    .getElementById(
+      "input-bar"
+    )
+    ?.classList.remove(
+      "hidden"
+    );
+
+
+  const name =
+    document.getElementById(
+      "chat-contact-name"
+    );
+
+  if (name) {
+    name.textContent =
+      contact.username;
+  }
+
+
+  setAvatar(
+    document.getElementById(
+      "chat-avatar"
+    ),
+
+    contact.username,
+    contact.phone,
+    38
+  );
+
+
+  showNormalStatus(
+    phone
+  );
+
+
+  socket.emit(
+    "load-messages",
+    {
+      otherPhone:
+        phone,
+    }
+  );
+
+
+  document
+    .getElementById(
+      "msg-input"
+    )
+    ?.focus();
 }
 
-socket.on("message-history", (messages) => {
-  const msgsEl = document.getElementById("messages");
-  msgsEl.innerHTML = "";
 
-  messages.forEach(msg => {
-    appendBubble({
-      from: msg.fromPhone === me.phone ? "me" : "them",
-      text: msg.message,
-      timestamp: msg.timestamp
-    }, false);
-  });
+// ======================================================
+// MOBILE BACK
+// ======================================================
 
-  msgsEl.scrollTop = msgsEl.scrollHeight;
-});
+document
+  .getElementById(
+    "chat-back-btn"
+  )
+  ?.addEventListener(
+    "click",
+    () => {
+      document
+        .getElementById(
+          "chat-area"
+        )
+        ?.classList.remove(
+          "active-chat"
+        );
 
-// Mobile — back button
-document.getElementById("chat-back-btn").addEventListener("click", () => {
-  document.getElementById("chat-area").classList.remove("active-chat");
-  activePhone = null;
-});
+      activePhone = null;
+    }
+  );
 
-// ─────────────────────────────────────────
-// MESSAGING LOGIC
-// ─────────────────────────────────────────
-document.getElementById("send-btn").addEventListener("click", sendMsg);
-document.getElementById("msg-input").addEventListener("keydown", e => {
-  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); }
-});
-document.getElementById("msg-input").addEventListener("input", function () {
-  autoResize(this);
-  if (!myTyping && activePhone) {
-    myTyping = true;
-    socket.emit("typing", { toPhone: activePhone, isTyping: true });
+
+// ======================================================
+// NORMAL ONLINE / LAST SEEN STATUS
+// ======================================================
+
+function showNormalStatus(
+  phone
+) {
+  if (
+    phone !== activePhone
+  ) {
+    return;
   }
-  clearTimeout(myTypingTimer);
-  myTypingTimer = setTimeout(() => {
-    myTyping = false;
-    if (activePhone) socket.emit("typing", { toPhone: activePhone, isTyping: false });
-  }, 1500);
-});
+
+  const contact =
+    contacts[phone];
+
+  if (!contact) return;
+
+  const status =
+    document.getElementById(
+      "chat-contact-status"
+    );
+
+  if (!status) return;
+
+  if (contact.online) {
+    status.textContent =
+      "online";
+
+    return;
+  }
+
+  if (contact.lastSeen) {
+    status.textContent =
+      "last seen " +
+      formatLastSeen(
+        contact.lastSeen
+      );
+
+    return;
+  }
+
+  status.textContent =
+    "offline";
+}
+
+
+function formatLastSeen(
+  dateValue
+) {
+  const date =
+    new Date(dateValue);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return "";
+  }
+
+  const now =
+    new Date();
+
+  const time =
+    date.toLocaleTimeString(
+      [],
+      {
+        hour: "2-digit",
+        minute: "2-digit",
+      }
+    );
+
+  if (
+    date.toDateString() ===
+    now.toDateString()
+  ) {
+    return (
+      "today at " +
+      time
+    );
+  }
+
+  const yesterday =
+    new Date(now);
+
+  yesterday.setDate(
+    now.getDate() - 1
+  );
+
+  if (
+    date.toDateString() ===
+    yesterday.toDateString()
+  ) {
+    return (
+      "yesterday at " +
+      time
+    );
+  }
+
+  return (
+    date.toLocaleDateString() +
+    " at " +
+    time
+  );
+}
+
+
+// ======================================================
+// SEND MESSAGE
+// ======================================================
+
+document
+  .getElementById(
+    "send-btn"
+  )
+  ?.addEventListener(
+    "click",
+    sendMsg
+  );
+
+
+document
+  .getElementById(
+    "msg-input"
+  )
+  ?.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event.key === "Enter" &&
+        !event.shiftKey
+      ) {
+        event.preventDefault();
+
+        sendMsg();
+      }
+    }
+  );
+
+
+document
+  .getElementById(
+    "msg-input"
+  )
+  ?.addEventListener(
+    "input",
+    function () {
+      autoResize(this);
+
+      if (
+        !socket ||
+        !activePhone
+      ) {
+        return;
+      }
+
+      if (!myTyping) {
+        myTyping = true;
+
+        socket.emit(
+          "typing",
+          {
+            toPhone:
+              activePhone,
+
+            isTyping:
+              true,
+          }
+        );
+      }
+
+      clearTimeout(
+        myTypingTimer
+      );
+
+      const typingPhone =
+        activePhone;
+
+      myTypingTimer =
+        setTimeout(
+          () => {
+            myTyping = false;
+
+            if (
+              socket &&
+              typingPhone
+            ) {
+              socket.emit(
+                "typing",
+                {
+                  toPhone:
+                    typingPhone,
+
+                  isTyping:
+                    false,
+                }
+              );
+            }
+          },
+
+          1200
+        );
+    }
+  );
+
 
 function sendMsg() {
-  const input = document.getElementById("msg-input");
-  const text  = input.value.trim();
-  if (!text || !activePhone) return;
+  if (
+    !socket ||
+    !activePhone
+  ) {
+    return;
+  }
 
-  socket.emit("send-message", { toPhone: activePhone, message: text });
+  const input =
+    document.getElementById(
+      "msg-input"
+    );
+
+  const text =
+    input.value.trim();
+
+  if (!text) return;
+
+  socket.emit(
+    "send-message",
+    {
+      toPhone:
+        activePhone,
+
+      message:
+        text,
+    }
+  );
 
   input.value = "";
+
   autoResize(input);
 
   myTyping = false;
-  clearTimeout(myTypingTimer);
-  socket.emit("typing", { toPhone: activePhone, isTyping: false });
+
+  clearTimeout(
+    myTypingTimer
+  );
+
+  socket.emit(
+    "typing",
+    {
+      toPhone:
+        activePhone,
+
+      isTyping:
+        false,
+    }
+  );
 }
 
-socket.on("message-sent", ({ toPhone, message, timestamp }) => {
-  if (activePhone !== toPhone) return;
-  
-  const msgObj = { from: "me", text: message, timestamp };
-  contacts[toPhone].messages.push(msgObj);
-  contacts[toPhone].lastMsg  = message;
-  contacts[toPhone].lastTime = timestamp;
-  saveContacts();
 
-  appendBubble(msgObj, true);
-  updateLastMsg(toPhone, message, timestamp);
-});
+// ======================================================
+// MESSAGE BUBBLE
+// ======================================================
 
-socket.on("receive-message", ({ fromPhone, fromName, message, timestamp }) => {
-  if (!contacts[fromPhone]) {
-    contacts[fromPhone] = {
-      phone: fromPhone, username: fromName, online: true,
-      messages: [], unread: 0, lastMsg: "", lastTime: "",
-    };
-    renderContactItem(contacts[fromPhone]);
+function appendBubble(
+  message,
+  scroll = true
+) {
+  const messagesElement =
+    document.getElementById(
+      "messages"
+    );
+
+  if (!messagesElement) return;
+
+
+  // WRAPPER
+  const wrapper =
+    document.createElement("div");
+
+  wrapper.className =
+    "bubble-wrap " +
+    (
+      message.from === "me"
+        ? "mine"
+        : "theirs"
+    );
+
+  if (message.id) {
+    wrapper.dataset.messageId =
+      message.id;
   }
 
-  const msgObj = { from: "them", text: message, timestamp };
-  contacts[fromPhone].messages.push(msgObj);
-  contacts[fromPhone].lastMsg  = message;
-  contacts[fromPhone].lastTime = timestamp;
 
-  if (activePhone === fromPhone) {
-    appendBubble(msgObj, true);
-  } else {
-    contacts[fromPhone].unread++;
-    const badge = document.getElementById("badge_" + fromPhone);
-    if (badge) { badge.style.display = "flex"; badge.textContent = contacts[fromPhone].unread; }
+  // BUBBLE
+  const bubble =
+    document.createElement("div");
+
+  bubble.className = "bubble";
+
+
+  // TEXT
+  const text =
+    document.createElement("span");
+
+  text.className =
+    "message-text";
+
+  text.textContent =
+    message.text;
+
+
+  // META
+  const meta =
+    document.createElement("span");
+
+  meta.className =
+    "message-meta";
+
+
+  if (message.edited) {
+    const edited =
+      document.createElement("span");
+
+    edited.className =
+      "edited-label";
+
+    edited.textContent =
+      "edited";
+
+    meta.appendChild(edited);
   }
 
-  updateLastMsg(fromPhone, message, timestamp);
-  saveContacts();
 
-  const li = document.querySelector(`.contact-item[data-phone="${fromPhone}"]`);
-  if (li) document.getElementById("contacts-list").prepend(li);
-});
+  const time =
+    document.createElement("span");
 
-function appendBubble(msg, scroll) {
-  const wrap = document.createElement("div");
-  wrap.className = "bubble-wrap " + (msg.from === "me" ? "mine" : "theirs");
-  const bub = document.createElement("div");
-  bub.className = "bubble";
-  bub.innerHTML = escHtml(msg.text) + `<span class="btime">${msg.timestamp}</span>`;
-  wrap.appendChild(bub);
-  const msgsEl = document.getElementById("messages");
-  msgsEl.appendChild(wrap);
-  if (scroll) msgsEl.scrollTop = msgsEl.scrollHeight;
+  time.className =
+    "btime";
+
+  time.textContent =
+    message.timestamp || "";
+
+  meta.appendChild(time);
+
+
+  bubble.appendChild(text);
+  bubble.appendChild(meta);
+
+
+  // ==========================================
+  // OWN MESSAGE → MENU
+  // ==========================================
+
+  if (
+    message.from === "me" &&
+    message.id
+  ) {
+
+    const menuButton =
+      document.createElement(
+        "button"
+      );
+
+    menuButton.className =
+      "message-menu-btn";
+
+    menuButton.type =
+      "button";
+
+    menuButton.textContent =
+      "⋮";
+
+    menuButton.title =
+      "Message options";
+
+
+    const menu =
+      document.createElement(
+        "div"
+      );
+
+    menu.className =
+      "message-menu hidden";
+
+
+    // EDIT
+    const editButton =
+      document.createElement(
+        "button"
+      );
+
+    editButton.type =
+      "button";
+
+    editButton.textContent =
+      "Edit";
+
+
+    editButton.addEventListener(
+      "click",
+      () => {
+
+        menu.classList.add(
+          "hidden"
+        );
+
+        editMessage(
+          message.id,
+          message.text
+        );
+      }
+    );
+
+
+    // DELETE
+    const deleteButton =
+      document.createElement(
+        "button"
+      );
+
+    deleteButton.type =
+      "button";
+
+    deleteButton.className =
+      "delete-option";
+
+    deleteButton.textContent =
+      "Delete";
+
+
+    deleteButton.addEventListener(
+      "click",
+      () => {
+
+        menu.classList.add(
+          "hidden"
+        );
+
+        deleteMessage(
+          message.id
+        );
+      }
+    );
+
+
+    menu.appendChild(
+      editButton
+    );
+
+    menu.appendChild(
+      deleteButton
+    );
+
+
+    menuButton.addEventListener(
+      "click",
+      (event) => {
+
+        event.stopPropagation();
+
+        document
+          .querySelectorAll(
+            ".message-menu"
+          )
+          .forEach((otherMenu) => {
+
+            if (
+              otherMenu !== menu
+            ) {
+              otherMenu.classList.add(
+                "hidden"
+              );
+            }
+
+          });
+
+        menu.classList.toggle(
+          "hidden"
+        );
+      }
+    );
+
+
+    wrapper.appendChild(
+      menuButton
+    );
+
+    wrapper.appendChild(
+      menu
+    );
+  }
+
+
+  wrapper.appendChild(
+    bubble
+  );
+
+  messagesElement.appendChild(
+    wrapper
+  );
+
+
+  if (scroll) {
+    messagesElement.scrollTop =
+      messagesElement.scrollHeight;
+  }
 }
 
-function updateLastMsg(phone, text, time) {
-  const lastEl = document.getElementById("last_" + phone);
-  const timeEl = document.getElementById("time_" + phone);
-  if (lastEl) lastEl.textContent = text;
-  if (timeEl) timeEl.textContent = time;
+
+
+function editMessage(
+  messageId,
+  currentText
+) {
+  if (
+    !socket ||
+    !messageId
+  ) {
+    return;
+  }
+
+  const newText =
+    prompt(
+      "Edit message:",
+      currentText
+    );
+
+  // Cancel
+  if (newText === null) {
+    return;
+  }
+
+  const cleanText =
+    newText.trim();
+
+  if (!cleanText) {
+    alert(
+      "Message cannot be empty."
+    );
+
+    return;
+  }
+
+  if (
+    cleanText === currentText
+  ) {
+    return;
+  }
+
+  socket.emit(
+    "edit-message",
+    {
+      messageId,
+      newMessage:
+        cleanText,
+    }
+  );
 }
 
-socket.on("typing", ({ fromPhone, isTyping }) => {
-  if (fromPhone !== activePhone) return;
-  const bar = document.getElementById("typing-bar");
-  clearTimeout(typingTimers[fromPhone]);
-  if (isTyping) {
-    bar.textContent = (contacts[fromPhone]?.username || "They") + " is typing…";
-    typingTimers[fromPhone] = setTimeout(() => { bar.textContent = ""; }, 3000);
-  } else {
-    bar.textContent = "";
+
+function deleteMessage(
+  messageId
+) {
+  if (
+    !socket ||
+    !messageId
+  ) {
+    return;
   }
-});
 
-// ─────────────────────────────────────────
-// ONLINE / OFFLINE STATUS
-// ─────────────────────────────────────────
-socket.on("user-online", ({ phone }) => {
-  if (contacts[phone]) {
-    contacts[phone].online = true;
-    const dot = document.getElementById("dot_" + phone);
-    if (dot) dot.style.display = "block";
-    if (activePhone === phone)
-      document.getElementById("chat-contact-status").textContent = "online";
+  const confirmed =
+    confirm(
+      "Delete this message for everyone?"
+    );
+
+  if (!confirmed) {
+    return;
   }
-});
 
-socket.on("user-offline", ({ phone }) => {
-  if (contacts[phone]) {
-    contacts[phone].online = false;
-    const dot = document.getElementById("dot_" + phone);
-    if (dot) dot.style.display = "none";
-    if (activePhone === phone)
-      document.getElementById("chat-contact-status").textContent = "+91 " + phone;
+  socket.emit(
+    "delete-message",
+    {
+      messageId,
+    }
+  );
+}
+
+// ======================================================
+// UPDATE LAST MESSAGE
+// ======================================================
+
+function updateLastMsg(
+  phone,
+  text,
+  time
+) {
+  const last =
+    document.getElementById(
+      "last_" + phone
+    );
+
+  const timeElement =
+    document.getElementById(
+      "time_" + phone
+    );
+
+  if (last) {
+    last.textContent =
+      text;
   }
-});
 
-// ─────────────────────────────────────────
-// CALLS — UI & LOGIC
-// ─────────────────────────────────────────
-function initCallUI(peerPhone, peerName, type) {
-  document.getElementById("call-overlay").classList.remove("hidden");
-  document.getElementById("call-peer-name").textContent   = peerName;
-  document.getElementById("call-status-text").textContent = "Connecting…";
+  if (timeElement) {
+    timeElement.textContent =
+      time;
+  }
+}
 
-  const audioAv    = document.getElementById("audio-avatar");
-  const remoteVid  = document.getElementById("remote-video");
-  const localVid   = document.getElementById("local-video");
-  const btnCam     = document.getElementById("btn-cam");
-  const btnSpk     = document.getElementById("btn-spk");
 
-  setAvatar(audioAv, peerName, peerPhone, 120);
+// ======================================================
+// CALL UI
+// ======================================================
+
+function initCallUI(
+  peerPhone,
+  peerName,
+  type
+) {
+  document
+    .getElementById(
+      "call-overlay"
+    )
+    ?.classList.remove(
+      "hidden"
+    );
+
+  const name =
+    document.getElementById(
+      "call-peer-name"
+    );
+
+  const status =
+    document.getElementById(
+      "call-status-text"
+    );
+
+  if (name) {
+    name.textContent =
+      peerName;
+  }
+
+  if (status) {
+    status.textContent =
+      "Connecting...";
+  }
+
+
+  const audioAvatar =
+    document.getElementById(
+      "audio-avatar"
+    );
+
+  const remoteVideo =
+    document.getElementById(
+      "remote-video"
+    );
+
+  const localVideo =
+    document.getElementById(
+      "local-video"
+    );
+
+  const btnCam =
+    document.getElementById(
+      "btn-cam"
+    );
+
+  const btnSpeaker =
+    document.getElementById(
+      "btn-spk"
+    );
+
+
+  setAvatar(
+    audioAvatar,
+    peerName,
+    peerPhone,
+    120
+  );
+
+
+  // Speaker button default OFF
+  btnSpeaker?.classList.remove(
+    "active"
+  );
+
+  if (remoteVideo) {
+    remoteVideo.volume =
+      0.4;
+  }
+
 
   if (type === "video") {
-    remoteVid.classList.remove("hidden");
-    localVid.classList.remove("hidden");
-    audioAv.classList.add("hidden");
-    btnCam.classList.remove("active");
-    btnSpk.classList.add("active");
-    remoteVid.volume = 1.0;
+    remoteVideo?.classList.remove(
+      "hidden"
+    );
+
+    localVideo?.classList.remove(
+      "hidden"
+    );
+
+    audioAvatar?.classList.add(
+      "hidden"
+    );
+
+    btnCam?.classList.remove(
+      "hidden"
+    );
+
+    btnCam?.classList.remove(
+      "active"
+    );
   } else {
-    remoteVid.classList.add("hidden");
-    localVid.classList.add("hidden");
-    audioAv.classList.remove("hidden");
-    btnCam.classList.add("active");
-    btnSpk.classList.remove("active");
-    remoteVid.volume = 0.4;
+    remoteVideo?.classList.add(
+      "hidden"
+    );
+
+    localVideo?.classList.add(
+      "hidden"
+    );
+
+    audioAvatar?.classList.remove(
+      "hidden"
+    );
+
+    btnCam?.classList.add(
+      "hidden"
+    );
   }
 }
 
-document.getElementById("voice-call-btn").addEventListener("click", () => {
-  if (!activePhone) return;
-  initCallUI(activePhone, contacts[activePhone].username, "audio");
-  rtc.startCall(activePhone, "audio");
-});
 
-document.getElementById("video-call-btn").addEventListener("click", () => {
-  if (!activePhone) return;
-  initCallUI(activePhone, contacts[activePhone].username, "video");
-  rtc.startCall(activePhone, "video");
-});
+// ======================================================
+// VOICE CALL
+// ======================================================
 
-document.getElementById("logout-btn").addEventListener("click", () => {
-  if (!confirm("Logout from FriendCall?")) return;
-  localStorage.removeItem("me");
-  socket.disconnect();
-  location.reload();
-});
+document
+  .getElementById(
+    "voice-call-btn"
+  )
+  ?.addEventListener(
+    "click",
+    () => {
+      if (
+        !activePhone ||
+        !rtc
+      ) {
+        return;
+      }
 
-socket.on("incoming-call", ({ fromPhone, fromName, offer, callType }) => {
-  ringtone.play().catch(err => console.warn("Ringtone blocked:", err));
-  pendingCall = { fromPhone, fromName, offer, callType };
+      const contact =
+        contacts[
+          activePhone
+        ];
 
-  if (!contacts[fromPhone]) {
-    contacts[fromPhone] = {
-      phone: fromPhone, username: fromName, online: true,
-      messages: [], unread: 0, lastMsg: "", lastTime: "",
-    };
-    renderContactItem(contacts[fromPhone]);
-    saveContacts();
-  }
+      initCallUI(
+        activePhone,
+        contact.username,
+        "audio"
+      );
 
-  document.getElementById("inc-name").textContent = fromName;
-  document.getElementById("inc-type").textContent = callType === "video" ? "Incoming video call…" : "Incoming voice call…";
-  setAvatar(document.getElementById("inc-avatar"), fromName, fromPhone, 72);
-  document.getElementById("modal-call").classList.remove("hidden");
-});
+      rtc.startCall(
+        activePhone,
+        "audio"
+      );
+    }
+  );
 
-document.getElementById("btn-accept").addEventListener("click", () => {
-  stopRingtone();
-  if (!pendingCall) return;
-  document.getElementById("modal-call").classList.add("hidden");
-  initCallUI(pendingCall.fromPhone, pendingCall.fromName, pendingCall.callType);
-  rtc.acceptCall(pendingCall.fromPhone, pendingCall.offer, pendingCall.callType);
-  pendingCall = null;
-});
 
-document.getElementById("btn-reject").addEventListener("click", () => {
-  stopRingtone();
-  if (pendingCall) {
-    socket.emit("reject-call", { toPhone: pendingCall.fromPhone });
-    pendingCall = null;
-  }
-  document.getElementById("modal-call").classList.add("hidden");
-});
+// ======================================================
+// VIDEO CALL
+// ======================================================
 
-socket.on("call-rejected", () => {
-  stopRingtone();
-  alert("Call was rejected.");
-  closeCallOverlay();
-});
+document
+  .getElementById(
+    "video-call-btn"
+  )
+  ?.addEventListener(
+    "click",
+    () => {
+      if (
+        !activePhone ||
+        !rtc
+      ) {
+        return;
+      }
 
-socket.on("call-ended", () => {
-  stopRingtone();
-  closeCallOverlay();
-});
+      const contact =
+        contacts[
+          activePhone
+        ];
 
-document.getElementById("btn-hangup").addEventListener("click", () => {
-  rtc.hangup();
-  closeCallOverlay();
-});
+      initCallUI(
+        activePhone,
+        contact.username,
+        "video"
+      );
 
-document.getElementById("btn-mute").addEventListener("click", function () {
-  rtc.toggleMute();
-  this.classList.toggle("active");
-});
+      rtc.startCall(
+        activePhone,
+        "video"
+      );
+    }
+  );
 
-document.getElementById("btn-cam").addEventListener("click", function () {
-  rtc.toggleCam();
-  this.classList.toggle("active");
-  document.getElementById("local-video").classList.toggle("hidden");
-});
 
-document.getElementById("btn-spk").addEventListener("click", function () {
-  this.classList.toggle("active");
-  const remoteVid = document.getElementById("remote-video");
-  remoteVid.volume = this.classList.contains("active") ? 1.0 : 0.4;
-});
+// ======================================================
+// ACCEPT CALL
+// ======================================================
+
+document
+  .getElementById(
+    "btn-accept"
+  )
+  ?.addEventListener(
+    "click",
+    async () => {
+      stopRingtone();
+
+      if (
+        !pendingCall ||
+        !rtc
+      ) {
+        return;
+      }
+
+      const call = {
+        ...pendingCall,
+      };
+
+      pendingCall = null;
+
+      document
+        .getElementById(
+          "modal-call"
+        )
+        ?.classList.add(
+          "hidden"
+        );
+
+      initCallUI(
+        call.fromPhone,
+        call.fromName,
+        call.callType
+      );
+
+      await rtc.acceptCall(
+        call.fromPhone,
+        call.offer,
+        call.callType
+      );
+    }
+  );
+
+
+// ======================================================
+// REJECT CALL
+// ======================================================
+
+document
+  .getElementById(
+    "btn-reject"
+  )
+  ?.addEventListener(
+    "click",
+    () => {
+      stopRingtone();
+
+      if (
+        pendingCall &&
+        socket
+      ) {
+        socket.emit(
+          "reject-call",
+          {
+            toPhone:
+              pendingCall
+                .fromPhone,
+          }
+        );
+      }
+
+      pendingCall = null;
+
+      document
+        .getElementById(
+          "modal-call"
+        )
+        ?.classList.add(
+          "hidden"
+        );
+    }
+  );
+
+
+// ======================================================
+// HANGUP
+// ======================================================
+
+document
+  .getElementById(
+    "btn-hangup"
+  )
+  ?.addEventListener(
+    "click",
+    () => {
+      rtc?.hangup();
+
+      closeCallOverlay();
+    }
+  );
+
+
+// ======================================================
+// MUTE
+// RTC handles active class itself.
+// DO NOT toggle it again here.
+// ======================================================
+
+document
+  .getElementById(
+    "btn-mute"
+  )
+  ?.addEventListener(
+    "click",
+    () => {
+      rtc?.toggleMute();
+    }
+  );
+
+
+// ======================================================
+// CAMERA
+// RTC handles UI itself.
+// ======================================================
+
+document
+  .getElementById(
+    "btn-cam"
+  )
+  ?.addEventListener(
+    "click",
+    () => {
+      rtc?.toggleCam();
+    }
+  );
+
+
+// ======================================================
+// SPEAKER BUTTON
+//
+// IMPORTANT:
+// Browser volume is controlled here.
+// Physical phone speaker/earpiece routing depends on browser/device.
+// ======================================================
+
+document
+  .getElementById(
+    "btn-spk"
+  )
+  ?.addEventListener(
+    "click",
+    function () {
+      const remoteVideo =
+        document.getElementById(
+          "remote-video"
+        );
+
+      if (!remoteVideo) {
+        return;
+      }
+
+      this.classList.toggle(
+        "active"
+      );
+
+      if (
+        this.classList.contains(
+          "active"
+        )
+      ) {
+        remoteVideo.volume =
+          1;
+      } else {
+        remoteVideo.volume =
+          0.4;
+      }
+    }
+  );
+
+
+// ======================================================
+// LOGOUT
+// ======================================================
+
+document
+  .getElementById(
+    "logout-btn"
+  )
+  ?.addEventListener(
+    "click",
+    () => {
+      const confirmed =
+        confirm(
+          "Logout from FriendCall?"
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      localStorage.removeItem(
+        "friendcall_token"
+      );
+
+      if (socket) {
+        socket.disconnect();
+      }
+
+      location.reload();
+    }
+  );
+
+
+// ======================================================
+// STOP RINGTONE
+// ======================================================
 
 function stopRingtone() {
   ringtone.pause();
-  ringtone.currentTime = 0;
+
+  ringtone.currentTime =
+    0;
 }
+
+
+// ======================================================
+// CLOSE CALL UI
+// ======================================================
 
 function closeCallOverlay() {
-  document.getElementById("call-overlay").classList.add("hidden");
-  const localVid  = document.getElementById("local-video");
-  const remoteVid = document.getElementById("remote-video");
-  if (localVid.srcObject)  { localVid.srcObject.getTracks().forEach(t => t.stop());  localVid.srcObject  = null; }
-  if (remoteVid.srcObject) { remoteVid.srcObject.getTracks().forEach(t => t.stop()); remoteVid.srcObject = null; }
+  document
+    .getElementById(
+      "call-overlay"
+    )
+    ?.classList.add(
+      "hidden"
+    );
+
+  document
+    .getElementById(
+      "modal-call"
+    )
+    ?.classList.add(
+      "hidden"
+    );
+
+  pendingCall = null;
 }
 
-function escHtml(s) {
-  return s
-    .replace(/&/g,  "&amp;")
-    .replace(/</g,  "&lt;")
-    .replace(/>/g,  "&gt;")
-    .replace(/"/g,  "&quot;")
-    .replace(/\n/g, "<br>");
+
+// ======================================================
+// HTML ESCAPE
+// ======================================================
+
+function escHtml(value) {
+  return String(
+    value ?? ""
+  )
+    .replace(
+      /&/g,
+      "&amp;"
+    )
+    .replace(
+      /</g,
+      "&lt;"
+    )
+    .replace(
+      />/g,
+      "&gt;"
+    )
+    .replace(
+      /"/g,
+      "&quot;"
+    )
+    .replace(
+      /'/g,
+      "&#039;"
+    )
+    .replace(
+      /\n/g,
+      "<br>"
+    );
 }
 
-function autoResize(el) {
-  el.style.height = "auto";
-  el.style.height = Math.min(el.scrollHeight, 120) + "px";
+
+// ======================================================
+// TEXTAREA AUTO RESIZE
+// ======================================================
+
+function autoResize(element) {
+  if (!element) return;
+
+  element.style.height =
+    "auto";
+
+  element.style.height =
+    Math.min(
+      element.scrollHeight,
+      120
+    ) + "px";
 }
 
-function shake(el) {
-  el.style.animation = "none";
-  el.offsetHeight; 
-  el.style.animation = "shake .3s ease";
-  setTimeout(() => el.style.animation = "", 400);
+
+// ======================================================
+// SHAKE
+// ======================================================
+
+function shake(element) {
+  if (!element) return;
+
+  element.style.animation =
+    "none";
+
+  element.offsetHeight;
+
+  element.style.animation =
+    "shake .3s ease";
+
+  setTimeout(() => {
+    element.style.animation =
+      "";
+  }, 400);
 }
 
-const sty = document.createElement("style");
-sty.textContent = `@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}`;
-document.head.appendChild(sty);
+
+// ======================================================
+// SHAKE CSS
+// ======================================================
+
+const shakeStyle =
+  document.createElement(
+    "style"
+  );
+
+shakeStyle.textContent = `
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-6px);
+  }
+
+  75% {
+    transform: translateX(6px);
+  }
+}
+`;
+
+document.head.appendChild(
+  shakeStyle
+);

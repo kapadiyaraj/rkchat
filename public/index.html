@@ -1,166 +1,761 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta name="theme-color" content="#25D366"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#25D366" />
+
   <title>FriendCall</title>
-  <link rel="stylesheet" href="css/style.css"/>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+
+  <link rel="stylesheet" href="css/style.css" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
 </head>
+
 <body>
 
-<!-- ══════════════════════════════════════
-     SCREEN 1 — REGISTER
-══════════════════════════════════════ -->
+<!-- =====================================================
+     AUTH SCREEN
+===================================================== -->
+
 <div id="screen-register" class="screen active">
+
   <div class="auth-card">
 
+    <!-- BRAND -->
+
     <div class="brand">
+
       <div class="brand-icon">
-        <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
-          <circle cx="14" cy="14" r="14" fill="#25D366"/>
-          <path d="M20 17.5c-.3-.15-1.8-.9-2.1-1-.3-.1-.5-.15-.7.15-.2.3-.8 1-1 1.2-.18.2-.37.22-.67.07A8.4 8.4 0 0 1 13 16.1a8.1 8.1 0 0 1-1.7-2.5c-.18-.3 0-.47.13-.62.14-.14.3-.37.45-.56.15-.18.2-.3.3-.5.1-.2.05-.38-.02-.53-.08-.15-.7-1.7-.96-2.33-.25-.6-.5-.52-.7-.53h-.6c-.2 0-.52.07-.8.38C8.87 9.25 8 10.1 8 11.8s1.26 3.44 1.44 3.68c.17.23 2.5 3.8 6.05 5.33.85.36 1.5.58 2.02.74.85.27 1.62.23 2.23.14.68-.1 2.1-.86 2.4-1.7.3-.83.3-1.55.2-1.7-.1-.14-.3-.22-.6-.37z" fill="white"/>
+
+        <svg
+          width="26"
+          height="26"
+          viewBox="0 0 28 28"
+          fill="none"
+        >
+          <circle
+            cx="14"
+            cy="14"
+            r="14"
+            fill="#25D366"
+          />
+
+          <path
+            d="M20 17.5c-.3-.15-1.8-.9-2.1-1-.3-.1-.5-.15-.7.15-.2.3-.8 1-1 1.2-.18.2-.37.22-.67.07A8.4 8.4 0 0 1 13 16.1a8.1 8.1 0 0 1-1.7-2.5c-.18-.3 0-.47.13-.62.14-.14.3-.37.45-.56.15-.18.2-.3.3-.5.1-.2.05-.38-.02-.53-.08-.15-.7-1.7-.96-2.33-.25-.6-.5-.52-.7-.53h-.6c-.2 0-.52.07-.8.38C8.87 9.25 8 10.1 8 11.8s1.26 3.44 1.44 3.68c.17.23 2.5 3.8 6.05 5.33.85.36 1.5.58 2.02.74.85.27 1.62.23 2.23.14.68-.1 2.1-.86 2.4-1.7.3-.83.3-1.55.2-1.7-.1-.14-.3-.22-.6-.37z"
+            fill="white"
+          />
         </svg>
+
       </div>
-      <span class="brand-name">FriendCall</span>
+
+      <span class="brand-name">
+        FriendCall
+      </span>
+
     </div>
 
-    <h2>Get started</h2>
-    <p class="sub">Enter your details to register</p>
 
-    <div class="field">
-      <label for="reg-name">Your name</label>
-      <input id="reg-name" type="text" placeholder="e.g. Rahul Shah" maxlength="30" autocomplete="name"/>
-    </div>
+    <!-- =================================================
+         REGISTER FORM
+    ================================================= -->
 
-    <div class="field">
-      <label for="reg-phone">Phone number</label>
-      <div class="phone-row">
-        <span class="country-code">+91</span>
-        <input id="reg-phone" type="tel" placeholder="9876543210" maxlength="10" autocomplete="tel"/>
+    <div id="register-form">
+
+      <h2>Create account</h2>
+
+      <p class="sub">
+        Create your FriendCall profile
+      </p>
+
+
+      <!-- NAME -->
+
+      <div class="field">
+
+        <label for="reg-name">
+          Your name
+        </label>
+
+        <input
+          id="reg-name"
+          type="text"
+          placeholder="e.g. Rahul Shah"
+          maxlength="40"
+          autocomplete="name"
+        />
+
       </div>
+
+
+      <!-- PHONE -->
+
+      <div class="field">
+
+        <label for="reg-phone">
+          Mobile number
+        </label>
+
+        <div class="phone-row">
+
+          <span class="country-code">
+            +91
+          </span>
+
+          <input
+            id="reg-phone"
+            type="tel"
+            inputmode="numeric"
+            placeholder="9876543210"
+            maxlength="10"
+            autocomplete="tel"
+          />
+
+        </div>
+
+      </div>
+
+
+      <!-- PASSWORD -->
+
+      <div class="field">
+
+        <label for="reg-password">
+          Password
+        </label>
+
+        <input
+          id="reg-password"
+          type="password"
+          placeholder="Minimum 6 characters"
+          minlength="6"
+          autocomplete="new-password"
+        />
+
+      </div>
+
+
+      <!-- ERROR -->
+
+      <p
+        id="register-error"
+        class="auth-error"
+        aria-live="polite"
+      ></p>
+
+
+      <!-- REGISTER BUTTON -->
+
+      <button
+        id="reg-btn"
+        type="button"
+        class="btn-green"
+      >
+        Create Account →
+      </button>
+
+
+      <p class="auth-switch">
+
+        Already have an account?
+
+        <button
+          id="show-login-btn"
+          type="button"
+          class="auth-link"
+        >
+          Login
+        </button>
+
+      </p>
+
     </div>
 
-    <button id="reg-btn" class="btn-green">Register →</button>
-    <p class="note">Your number is used as your ID — no OTP needed for this demo</p>
+
+    <!-- =================================================
+         LOGIN FORM
+    ================================================= -->
+
+    <div
+      id="login-form"
+      class="hidden"
+    >
+
+      <h2>Welcome back</h2>
+
+      <p class="sub">
+        Login to continue to FriendCall
+      </p>
+
+
+      <!-- PHONE -->
+
+      <div class="field">
+
+        <label for="login-phone">
+          Mobile number
+        </label>
+
+        <div class="phone-row">
+
+          <span class="country-code">
+            +91
+          </span>
+
+          <input
+            id="login-phone"
+            type="tel"
+            inputmode="numeric"
+            placeholder="9876543210"
+            maxlength="10"
+            autocomplete="tel"
+          />
+
+        </div>
+
+      </div>
+
+
+      <!-- PASSWORD -->
+
+      <div class="field">
+
+        <label for="login-password">
+          Password
+        </label>
+
+        <input
+          id="login-password"
+          type="password"
+          placeholder="Enter your password"
+          autocomplete="current-password"
+        />
+
+      </div>
+
+
+      <!-- ERROR -->
+
+      <p
+        id="login-error"
+        class="auth-error"
+        aria-live="polite"
+      ></p>
+
+
+      <!-- LOGIN -->
+
+      <button
+        id="login-btn"
+        type="button"
+        class="btn-green"
+      >
+        Login →
+      </button>
+
+
+      <p class="auth-switch">
+
+        Don't have an account?
+
+        <button
+          id="show-register-btn"
+          type="button"
+          class="auth-link"
+        >
+          Register
+        </button>
+
+      </p>
+
+    </div>
 
   </div>
+
 </div>
 
-<!-- ══════════════════════════════════════
-     SCREEN 2 — MAIN APP
-══════════════════════════════════════ -->
-<div id="screen-app" class="screen">
 
-  <!-- ── SIDEBAR ── -->
-  <aside class="sidebar" id="sidebar">
+<!-- =====================================================
+     MAIN APP
+===================================================== -->
 
-    <!-- My Profile + Add Contact -->
+<div
+  id="screen-app"
+  class="screen"
+>
+
+  <!-- ===================================================
+       SIDEBAR
+  =================================================== -->
+
+  <aside
+    class="sidebar"
+    id="sidebar"
+  >
+
+    <!-- PROFILE -->
+
     <div class="sidebar-top">
+
       <div class="my-profile">
-        <div class="avatar" id="my-avatar"></div>
+
+        <div
+          class="avatar"
+          id="my-avatar"
+        ></div>
+
         <div class="my-info">
-          <div class="my-name"  id="my-name"></div>
-          <div class="my-phone" id="my-phone"></div>
+
+          <div
+            class="my-name"
+            id="my-name"
+          ></div>
+
+          <div
+            class="my-phone"
+            id="my-phone"
+          ></div>
+
         </div>
+
       </div>
+
+
+      <!-- ACTIONS -->
+
       <div class="sidebar-actions">
-        <button id="add-contact-btn" class="btn-icon-round" title="Add contact" aria-label="Add contact">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <line x1="19" y1="8" x2="19" y2="14"/>
-            <line x1="22" y1="11" x2="16" y2="11"/>
+
+        <!-- ADD CONTACT -->
+
+        <button
+          id="add-contact-btn"
+          class="btn-icon-round"
+          title="Add contact"
+          aria-label="Add contact"
+        >
+
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+
+            <path
+              d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+            />
+
+            <circle
+              cx="9"
+              cy="7"
+              r="4"
+            />
+
+            <line
+              x1="19"
+              y1="8"
+              x2="19"
+              y2="14"
+            />
+
+            <line
+              x1="22"
+              y1="11"
+              x2="16"
+              y2="11"
+            />
+
           </svg>
+
         </button>
-        <button id="logout-btn" class="btn-icon-round" title="Logout" aria-label="Logout">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/>
-            <line x1="21" y1="12" x2="9" y2="12"/>
+
+
+        <!-- LOGOUT -->
+
+        <button
+          id="logout-btn"
+          class="btn-icon-round"
+          title="Logout"
+          aria-label="Logout"
+        >
+
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+
+            <path
+              d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"
+            />
+
+            <polyline
+              points="16 17 21 12 16 7"
+            />
+
+            <line
+              x1="21"
+              y1="12"
+              x2="9"
+              y2="12"
+            />
+
           </svg>
+
         </button>
+
       </div>
+
     </div>
 
-    <!-- Search -->
+
+    <!-- SEARCH CONTACTS -->
+
     <div class="search-wrap">
+
       <div class="search-inner">
-        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+
+        <svg
+          class="search-icon"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+
+          <circle
+            cx="11"
+            cy="11"
+            r="8"
+          />
+
+          <line
+            x1="21"
+            y1="21"
+            x2="16.65"
+            y2="16.65"
+          />
+
         </svg>
-        <input id="search-input" type="text" placeholder="Search contacts…" aria-label="Search contacts"/>
+
+        <input
+          id="search-input"
+          type="text"
+          placeholder="Search contacts…"
+          aria-label="Search contacts"
+        />
+
       </div>
+
     </div>
 
-    <!-- Contacts List -->
-    <ul id="contacts-list" class="contacts-list" role="list">
+
+    <!-- CONTACT LIST -->
+
+    <ul
+      id="contacts-list"
+      class="contacts-list"
+      role="list"
+    >
+
       <li class="empty-contacts">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.3">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-          <circle cx="9" cy="7" r="4"/>
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#ccc"
+          stroke-width="1.3"
+        >
+
+          <path
+            d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"
+          />
+
+          <circle
+            cx="9"
+            cy="7"
+            r="4"
+          />
+
+          <path
+            d="M23 21v-2a4 4 0 0 0-3-3.87"
+          />
+
+          <path
+            d="M16 3.13a4 4 0 0 1 0 7.75"
+          />
+
         </svg>
-        <p>No contacts yet.<br/>Tap <strong>+</strong> to add a friend.</p>
+
+        <p>
+          No contacts yet.<br />
+          Tap <strong>+</strong> to add a friend.
+        </p>
+
       </li>
+
     </ul>
 
   </aside>
 
-  <!-- ── CHAT AREA ── -->
-  <main class="chat-area" id="chat-area">
 
-    <!-- Empty state (no chat selected) -->
-    <div class="chat-empty" id="chat-empty">
-      <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="#ddd" stroke-width="1.2">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  <!-- ===================================================
+       CHAT AREA
+  =================================================== -->
+
+  <main
+    class="chat-area"
+    id="chat-area"
+  >
+
+    <!-- EMPTY -->
+
+    <div
+      class="chat-empty"
+      id="chat-empty"
+    >
+
+      <svg
+        width="72"
+        height="72"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#ddd"
+        stroke-width="1.2"
+      >
+
+        <path
+          d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+        />
+
       </svg>
-      <p>Select a contact to start chatting</p>
+
+      <p>
+        Select a contact to start chatting
+      </p>
+
     </div>
 
-    <!-- Chat Header -->
-    <div class="chat-header hidden" id="chat-header">
+
+    <!-- CHAT HEADER -->
+
+    <div
+      class="chat-header hidden"
+      id="chat-header"
+    >
+
       <div class="chat-contact-info">
-        <!-- Back button (mobile only) -->
-        <button id="chat-back-btn" class="action-btn back-btn" title="Back" aria-label="Back">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <line x1="19" y1="12" x2="5" y2="12"/>
-            <polyline points="12 19 5 12 12 5"/>
+
+        <!-- BACK -->
+
+        <button
+          id="chat-back-btn"
+          class="action-btn back-btn"
+          title="Back"
+          aria-label="Back"
+        >
+
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+          >
+
+            <line
+              x1="19"
+              y1="12"
+              x2="5"
+              y2="12"
+            />
+
+            <polyline
+              points="12 19 5 12 12 5"
+            />
+
           </svg>
+
         </button>
-        <div class="avatar sm" id="chat-avatar"></div>
+
+
+        <div
+          class="avatar sm"
+          id="chat-avatar"
+        ></div>
+
+
         <div>
-          <div class="chat-contact-name"   id="chat-contact-name"></div>
-          <div class="chat-contact-status" id="chat-contact-status"></div>
+
+          <div
+            class="chat-contact-name"
+            id="chat-contact-name"
+          ></div>
+
+          <!--
+            online
+            typing...
+            offline
+            last seen today at ...
+          -->
+
+          <div
+            class="chat-contact-status"
+            id="chat-contact-status"
+          ></div>
+
         </div>
+
       </div>
+
+
+      <!-- CALL BUTTONS -->
+
       <div class="chat-actions">
-        <button class="action-btn" id="voice-call-btn" title="Voice call" aria-label="Voice call">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.6 1.21h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.82a16 16 0 0 0 6.29 6.29l.98-.98a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+
+        <!-- AUDIO -->
+
+        <button
+          class="action-btn"
+          id="voice-call-btn"
+          title="Voice call"
+          aria-label="Voice call"
+        >
+
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+
+            <path
+              d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.6 1.21h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.82a16 16 0 0 0 6.29 6.29l.98-.98a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"
+            />
+
           </svg>
+
         </button>
-        <button class="action-btn" id="video-call-btn" title="Video call" aria-label="Video call">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="23 7 16 12 23 17 23 7"/>
-            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+
+        <!-- CLEAR CHAT -->
+<button
+  class="action-btn"
+  id="clear-chat-btn"
+  title="Clear chat"
+  aria-label="Clear chat"
+>
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+  >
+    <polyline points="3 6 5 6 21 6"></polyline>
+
+    <path
+      d="M19 6l-1 14H6L5 6"
+    ></path>
+
+    <path
+      d="M8 6V4h8v2"
+    ></path>
+
+    <line x1="10" y1="11" x2="10" y2="17"></line>
+    <line x1="14" y1="11" x2="14" y2="17"></line>
+  </svg>
+</button>
+
+
+        <!-- VIDEO -->
+
+        <button
+          class="action-btn"
+          id="video-call-btn"
+          title="Video call"
+          aria-label="Video call"
+        >
+
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+
+            <polygon
+              points="23 7 16 12 23 17 23 7"
+            />
+
+            <rect
+              x="1"
+              y="5"
+              width="15"
+              height="14"
+              rx="2"
+              ry="2"
+            />
+
           </svg>
+
         </button>
+
       </div>
+
     </div>
 
-    <!-- Messages -->
-    <div class="messages hidden" id="messages" role="log" aria-live="polite"></div>
 
-    <!-- Typing indicator -->
-    <div class="typing-bar hidden" id="typing-bar" aria-live="polite"></div>
+    <!-- MESSAGES -->
 
-    <!-- Message Input -->
-    <div class="input-bar hidden" id="input-bar">
+    <div
+      class="messages hidden"
+      id="messages"
+      role="log"
+      aria-live="polite"
+    ></div>
+
+
+    <!--
+      Kept for compatibility with old JS/CSS.
+      New app.js displays typing in header.
+    -->
+
+    <div
+      class="typing-bar hidden"
+      id="typing-bar"
+      aria-live="polite"
+    ></div>
+
+
+    <!-- INPUT -->
+
+    <div
+      class="input-bar hidden"
+      id="input-bar"
+    >
+
       <textarea
         id="msg-input"
         placeholder="Type a message…"
@@ -168,135 +763,483 @@
         maxlength="2000"
         aria-label="Message input"
       ></textarea>
-      <button id="send-btn" class="btn-send" aria-label="Send message">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-          <line x1="22" y1="2" x2="11" y2="13"/>
-          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+
+
+      <button
+        id="send-btn"
+        class="btn-send"
+        aria-label="Send message"
+      >
+
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+        >
+
+          <line
+            x1="22"
+            y1="2"
+            x2="11"
+            y2="13"
+          />
+
+          <polygon
+            points="22 2 15 22 11 13 2 9 22 2"
+          />
+
         </svg>
+
       </button>
+
     </div>
 
   </main>
-</div><!-- end #screen-app -->
+
+</div>
 
 
-<!-- ══════════════════════════════════════
-     MODAL — ADD CONTACT
-══════════════════════════════════════ -->
-<div id="modal-add" class="modal-bg hidden" role="dialog" aria-modal="true" aria-labelledby="modal-add-title">
+<!-- =====================================================
+     ADD CONTACT MODAL
+===================================================== -->
+
+<div
+  id="modal-add"
+  class="modal-bg hidden"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="modal-add-title"
+>
+
   <div class="modal">
+
     <div class="modal-header">
-      <div class="modal-title" id="modal-add-title">Add Contact</div>
-      <button class="modal-close-btn" id="cancel-add-btn" aria-label="Close">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
-    <div class="field">
-      <label for="add-phone-input">Enter their phone number</label>
-      <div class="phone-row">
-        <span class="country-code">+91</span>
-        <input id="add-phone-input" type="tel" placeholder="9876543210" maxlength="10"/>
+
+      <div
+        class="modal-title"
+        id="modal-add-title"
+      >
+        Add Contact
       </div>
+
+
+      <button
+        class="modal-close-btn"
+        id="cancel-add-btn"
+        aria-label="Close"
+      >
+
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+        >
+
+          <line
+            x1="18"
+            y1="6"
+            x2="6"
+            y2="18"
+          />
+
+          <line
+            x1="6"
+            y1="6"
+            x2="18"
+            y2="18"
+          />
+
+        </svg>
+
+      </button>
+
     </div>
-    <div id="add-result" class="add-result" role="status"></div>
+
+
+    <div class="field">
+
+      <label for="add-phone-input">
+        Enter their phone number
+      </label>
+
+      <div class="phone-row">
+
+        <span class="country-code">
+          +91
+        </span>
+
+        <input
+          id="add-phone-input"
+          type="tel"
+          inputmode="numeric"
+          placeholder="9876543210"
+          maxlength="10"
+        />
+
+      </div>
+
+    </div>
+
+
+    <div
+      id="add-result"
+      class="add-result"
+      role="status"
+    ></div>
+
+
     <div class="modal-btns">
-      <button id="search-btn" class="btn-green">Search</button>
+
+      <button
+        id="search-btn"
+        class="btn-green"
+      >
+        Search
+      </button>
+
     </div>
+
   </div>
+
 </div>
 
 
-<!-- ══════════════════════════════════════
-     MODAL — INCOMING CALL
-══════════════════════════════════════ -->
-<div id="modal-call" class="modal-bg hidden" role="dialog" aria-modal="true" aria-labelledby="inc-name">
+<!-- =====================================================
+     INCOMING CALL MODAL
+===================================================== -->
+
+<div
+  id="modal-call"
+  class="modal-bg hidden"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="inc-name"
+>
+
   <div class="modal call-modal">
-    <div class="call-avatar" id="inc-avatar"></div>
-    <div class="call-name"       id="inc-name"></div>
-    <div class="call-type-label" id="inc-type"></div>
+
+    <div
+      class="call-avatar"
+      id="inc-avatar"
+    ></div>
+
+    <div
+      class="call-name"
+      id="inc-name"
+    ></div>
+
+    <div
+      class="call-type-label"
+      id="inc-type"
+    ></div>
+
+
     <div class="call-modal-btns">
-      <button id="btn-reject" class="call-btn reject" aria-label="Decline call">
+
+      <!-- DECLINE -->
+
+      <button
+        id="btn-reject"
+        class="call-btn reject"
+        aria-label="Decline call"
+      >
+
         <span class="call-btn-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-            <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07C9.44 17.29 7.76 15.66 6.58 14a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 5.48 3h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L9.5 10.9a16 16 0 0 0 3.41 2.41z"/>
-            <line x1="23" y1="1" x2="1" y2="23"/>
+
+          <svg
+            width="26"
+            height="26"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+          >
+
+            <path
+              d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07"
+            />
+
+            <line
+              x1="23"
+              y1="1"
+              x2="1"
+              y2="23"
+            />
+
           </svg>
+
         </span>
+
         Decline
+
       </button>
-      <button id="btn-accept" class="call-btn accept" aria-label="Accept call">
+
+
+      <!-- ACCEPT -->
+
+      <button
+        id="btn-accept"
+        class="call-btn accept"
+        aria-label="Accept call"
+      >
+
         <span class="call-btn-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.6 1.21h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.82a16 16 0 0 0 6.29 6.29l.98-.98a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+
+          <svg
+            width="26"
+            height="26"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+          >
+
+            <path
+              d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.6 1.21h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.82a16 16 0 0 0 6.29 6.29l.98-.98a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"
+            />
+
           </svg>
+
         </span>
+
         Accept
+
       </button>
+
     </div>
+
   </div>
+
 </div>
 
 
-<!-- ══════════════════════════════════════
-     CALL OVERLAY (active call screen)
-══════════════════════════════════════ -->
-<div id="call-overlay" class="call-overlay hidden" role="dialog" aria-modal="true">
+<!-- =====================================================
+     ACTIVE CALL OVERLAY
+===================================================== -->
+
+<div
+  id="call-overlay"
+  class="call-overlay hidden"
+  role="dialog"
+  aria-modal="true"
+>
+
   <div class="call-screen">
 
-    <!-- Remote video / audio avatar -->
+    <!-- REMOTE -->
+
     <div class="remote-wrap">
-      <video id="remote-video" autoplay playsinline></video>
-      <div class="audio-avatar hidden" id="audio-avatar"></div>
+
+      <video
+        id="remote-video"
+        autoplay
+        playsinline
+      ></video>
+
+      <div
+        class="audio-avatar hidden"
+        id="audio-avatar"
+      ></div>
+
     </div>
 
-    <!-- Local video (PiP) -->
-    <video id="local-video" autoplay playsinline muted></video>
 
-    <!-- Call info -->
+    <!-- LOCAL CAMERA -->
+
+    <video
+      id="local-video"
+      autoplay
+      playsinline
+      muted
+    ></video>
+
+
+    <!-- CALL INFO -->
+
     <div class="call-info">
-      <div class="call-peer-name"   id="call-peer-name"></div>
-      <div class="call-status-text" id="call-status-text">Calling…</div>
+
+      <div
+        class="call-peer-name"
+        id="call-peer-name"
+      ></div>
+
+      <div
+        class="call-status-text"
+        id="call-status-text"
+      >
+        Calling…
+      </div>
+
     </div>
 
-    <!-- Controls -->
+
+    <!-- CONTROLS -->
+
     <div class="call-controls">
-      <button class="ctrl" id="btn-mute" title="Mute" aria-label="Toggle mute">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-          <line x1="12" y1="19" x2="12" y2="23"/>
-          <line x1="8"  y1="23" x2="16" y2="23"/>
+
+
+      <!-- MUTE -->
+
+      <button
+        class="ctrl"
+        id="btn-mute"
+        title="Mute"
+        aria-label="Toggle mute"
+      >
+
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+
+          <path
+            d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"
+          />
+
+          <path
+            d="M19 10v2a7 7 0 0 1-14 0v-2"
+          />
+
+          <line
+            x1="12"
+            y1="19"
+            x2="12"
+            y2="23"
+          />
+
         </svg>
+
       </button>
-      <button class="ctrl" id="btn-cam" title="Camera" aria-label="Toggle camera">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="23 7 16 12 23 17 23 7"/>
-          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+
+
+      <!-- CAMERA -->
+
+      <button
+        class="ctrl"
+        id="btn-cam"
+        title="Camera"
+        aria-label="Toggle camera"
+      >
+
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+
+          <polygon
+            points="23 7 16 12 23 17 23 7"
+          />
+
+          <rect
+            x="1"
+            y="5"
+            width="15"
+            height="14"
+            rx="2"
+            ry="2"
+          />
+
         </svg>
+
       </button>
-      <button class="ctrl hangup" id="btn-hangup" title="End call" aria-label="End call">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07C9.44 17.29 7.76 15.66 6.58 14a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 5.48 3h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L9.5 10.9a16 16 0 0 0 3.41 2.41z"/>
-          <line x1="23" y1="1" x2="1" y2="23"/>
+
+
+      <!-- HANGUP -->
+
+      <button
+        class="ctrl hangup"
+        id="btn-hangup"
+        title="End call"
+        aria-label="End call"
+      >
+
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+
+          <path
+            d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07"
+          />
+
+          <line
+            x1="23"
+            y1="1"
+            x2="1"
+            y2="23"
+          />
+
         </svg>
+
       </button>
-      <button class="ctrl" id="btn-spk" title="Speaker" aria-label="Toggle speaker">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+
+
+      <!-- SPEAKER -->
+
+      <button
+        class="ctrl"
+        id="btn-spk"
+        title="Speaker"
+        aria-label="Toggle speaker"
+      >
+
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+
+          <polygon
+            points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"
+          />
+
+          <path
+            d="M19.07 4.93a10 10 0 0 1 0 14.14"
+          />
+
+          <path
+            d="M15.54 8.46a5 5 0 0 1 0 7.07"
+          />
+
         </svg>
+
       </button>
+
     </div>
 
   </div>
-</div><!-- end #call-overlay -->
 
+</div>
+
+
+<!-- =====================================================
+     JAVASCRIPT
+===================================================== -->
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="js/rtc.js"></script>
 <script src="js/app.js"></script>
+
 </body>
 </html>
