@@ -19,29 +19,18 @@ class RTC {
     this.iceConfig = {
       iceServers: [
         {
-          urls:
-            "stun:stun.l.google.com:19302",
+          urls: "stun:stun.l.google.com:19302",
         },
-
         {
-          urls:
-            "stun:stun1.l.google.com:19302",
+          urls: "stun:stun1.l.google.com:19302",
         },
-
         {
-          urls:
-            "stun:stun.cloudflare.com:3478",
+          urls: "stun:stun.cloudflare.com:3478",
         },
-
         {
-          urls:
-            "turn:openrelay.metered.ca:80",
-
-          username:
-            "openrelayproject",
-
-          credential:
-            "openrelayproject",
+          urls: "turn:openrelay.metered.ca:80",
+          username: "openrelayproject",
+          credential: "openrelayproject",
         },
       ],
     };
@@ -57,24 +46,16 @@ class RTC {
     this.socket.on(
       "ice-candidate",
       async ({ candidate }) => {
-        if (
-          !this.pc ||
-          !candidate
-        ) {
+        if (!this.pc || !candidate) {
           return;
         }
 
         try {
           await this.pc.addIceCandidate(
-            new RTCIceCandidate(
-              candidate
-            )
+            new RTCIceCandidate(candidate)
           );
         } catch (err) {
-          console.warn(
-            "ICE candidate error:",
-            err
-          );
+          console.warn("ICE candidate error:", err);
         }
       }
     );
@@ -86,59 +67,36 @@ class RTC {
 
         try {
           await this.pc.setRemoteDescription(
-            new RTCSessionDescription(
-              answer
-            )
+            new RTCSessionDescription(answer)
           );
 
-          this.setStatus(
-            "Connected"
-          );
+          this.setStatus("Connected");
         } catch (err) {
-          console.error(
-            "Remote description error:",
-            err
-          );
+          console.error("Remote description error:", err);
         }
       }
     );
 
-    this.socket.on(
-      "call-ended",
-      () => {
-        this.setStatus(
-          "Call ended"
-        );
+    this.socket.on("call-ended", () => {
+      this.setStatus("Call ended");
 
-        setTimeout(() => {
-          this.hangup(true);
-        }, 700);
-      }
-    );
-
-    this.socket.on(
-      "call-rejected",
-      () => {
-        this.setStatus(
-          "Call declined"
-        );
-
-        setTimeout(() => {
-          this.hangup(true);
-        }, 900);
-      }
-    );
-
-    this.socket.on(
-      "call-failed",
-      (msg) => {
-        alert(
-          "Call failed: " + msg
-        );
-
+      setTimeout(() => {
         this.hangup(true);
-      }
-    );
+      }, 700);
+    });
+
+    this.socket.on("call-rejected", () => {
+      this.setStatus("Call declined");
+
+      setTimeout(() => {
+        this.hangup(true);
+      }, 900);
+    });
+
+    this.socket.on("call-failed", (msg) => {
+      alert("Call failed: " + msg);
+      this.hangup(true);
+    });
   }
 
   // ====================================================
@@ -146,39 +104,23 @@ class RTC {
   // ====================================================
 
   buildPC(peerPhone) {
-    const pc =
-      new RTCPeerConnection(
-        this.iceConfig
-      );
+    const pc = new RTCPeerConnection(this.iceConfig);
 
-    pc.onicecandidate = ({
-      candidate,
-    }) => {
+    pc.onicecandidate = ({ candidate }) => {
       if (!candidate) return;
 
-      this.socket.emit(
-        "ice-candidate",
-        {
-          toPhone: peerPhone,
-          candidate,
-        }
-      );
+      this.socket.emit("ice-candidate", {
+        toPhone: peerPhone,
+        candidate,
+      });
     };
 
-    pc.ontrack = ({
-      streams,
-    }) => {
+    pc.ontrack = ({ streams }) => {
       const remoteVideo =
-        document.getElementById(
-          "remote-video"
-        );
+        document.getElementById("remote-video");
 
-      if (
-        remoteVideo &&
-        streams[0]
-      ) {
-        remoteVideo.srcObject =
-          streams[0];
+      if (remoteVideo && streams[0]) {
+        remoteVideo.srcObject = streams[0];
 
         remoteVideo
           .play()
@@ -186,46 +128,27 @@ class RTC {
       }
     };
 
-    pc.oniceconnectionstatechange =
-      () => {
-        const state =
-          pc.iceConnectionState;
+    pc.oniceconnectionstatechange = () => {
+      const state = pc.iceConnectionState;
 
-        if (
-          state === "connected" ||
-          state === "completed"
-        ) {
-          this.setStatus(
-            "Connected"
-          );
-        }
+      if (state === "connected" || state === "completed") {
+        this.setStatus("Connected");
+      }
 
-        if (
-          state === "failed"
-        ) {
-          this.setStatus(
-            "Connection failed"
-          );
-        }
+      if (state === "failed") {
+        this.setStatus("Connection failed");
+      }
 
-        if (
-          state ===
-          "disconnected"
-        ) {
-          this.setStatus(
-            "Reconnecting..."
-          );
-        }
-      };
+      if (state === "disconnected") {
+        this.setStatus("Reconnecting...");
+      }
+    };
 
     if (this.localStream) {
       this.localStream
         .getTracks()
         .forEach((track) => {
-          pc.addTrack(
-            track,
-            this.localStream
-          );
+          pc.addTrack(track, this.localStream);
         });
     }
 
@@ -239,53 +162,40 @@ class RTC {
   async getMedia(wantVideo) {
     try {
       this.localStream =
-        await navigator.mediaDevices
-          .getUserMedia({
-            audio: true,
-            video: wantVideo,
-          });
+        await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: wantVideo,
+        });
     } catch (err) {
       if (wantVideo) {
         try {
           this.localStream =
-            await navigator
-              .mediaDevices
-              .getUserMedia({
-                audio: true,
-                video: false,
-              });
+            await navigator.mediaDevices.getUserMedia({
+              audio: true,
+              video: false,
+            });
 
-          console.warn(
-            "Camera unavailable. Audio only."
-          );
-
-          this.callType =
-            "audio";
+          console.warn("Camera unavailable. Audio only.");
+          this.callType = "audio";
         } catch {
           alert(
             "Microphone access denied. Please allow microphone permission."
           );
-
           return false;
         }
       } else {
         alert(
           "Microphone access denied. Please allow microphone permission."
         );
-
         return false;
       }
     }
 
     const localVideo =
-      document.getElementById(
-        "local-video"
-      );
+      document.getElementById("local-video");
 
     if (localVideo) {
-      localVideo.srcObject =
-        this.localStream;
-
+      localVideo.srcObject = this.localStream;
       localVideo.muted = true;
 
       localVideo
@@ -300,74 +210,40 @@ class RTC {
   // START OUTGOING CALL
   // ====================================================
 
-  async startCall(
-    peerPhone,
-    callType = "video"
-  ) {
-    if (
-      this.pc ||
-      this.localStream
-    ) {
+  async startCall(peerPhone, callType = "video") {
+    if (this.pc || this.localStream) {
       this.hangup(true);
     }
 
-    this.peerPhone =
-      peerPhone;
+    this.peerPhone = peerPhone;
+    this.callType = callType;
 
-    this.callType =
-      callType;
-
-    const mediaReady =
-      await this.getMedia(
-        callType === "video"
-      );
+    const mediaReady = await this.getMedia(
+      callType === "video"
+    );
 
     if (!mediaReady) {
       this.peerPhone = null;
       return;
     }
 
-    this.pc =
-      this.buildPC(
-        peerPhone
-      );
+    this.pc = this.buildPC(peerPhone);
 
     try {
-      const offer =
-        await this.pc.createOffer();
+      const offer = await this.pc.createOffer();
 
-      await this.pc.setLocalDescription(
-        offer
-      );
+      await this.pc.setLocalDescription(offer);
 
-      this.socket.emit(
-        "call-user",
-        {
-          toPhone:
-            peerPhone,
+      this.socket.emit("call-user", {
+        toPhone: peerPhone,
+        offer: this.pc.localDescription,
+        callType: this.callType,
+      });
 
-          offer:
-            this.pc
-              .localDescription,
-
-          callType:
-            this.callType,
-        }
-      );
-
-      this.setStatus(
-        "Calling..."
-      );
-
-      this.updateCallUI(
-        this.callType
-      );
+      this.setStatus("Calling...");
+      this.updateCallUI(this.callType);
     } catch (err) {
-      console.error(
-        "Start call error:",
-        err
-      );
-
+      console.error("Start call error:", err);
       this.hangup(true);
     }
   }
@@ -376,87 +252,47 @@ class RTC {
   // ACCEPT INCOMING CALL
   // ====================================================
 
-  async acceptCall(
-    fromPhone,
-    offer,
-    callType = "video"
-  ) {
-    if (
-      this.pc ||
-      this.localStream
-    ) {
+  async acceptCall(fromPhone, offer, callType = "video") {
+    if (this.pc || this.localStream) {
       this.hangup(true);
     }
 
-    this.peerPhone =
-      fromPhone;
+    this.peerPhone = fromPhone;
+    this.callType = callType;
 
-    this.callType =
-      callType;
-
-    const mediaReady =
-      await this.getMedia(
-        callType === "video"
-      );
+    const mediaReady = await this.getMedia(
+      callType === "video"
+    );
 
     if (!mediaReady) {
-      this.socket.emit(
-        "reject-call",
-        {
-          toPhone:
-            fromPhone,
-        }
-      );
+      this.socket.emit("reject-call", {
+        toPhone: fromPhone,
+      });
 
       this.peerPhone = null;
-
       return;
     }
 
-    this.pc =
-      this.buildPC(
-        fromPhone
-      );
+    this.pc = this.buildPC(fromPhone);
 
     try {
       await this.pc.setRemoteDescription(
-        new RTCSessionDescription(
-          offer
-        )
+        new RTCSessionDescription(offer)
       );
 
-      const answer =
-        await this.pc.createAnswer();
+      const answer = await this.pc.createAnswer();
 
-      await this.pc.setLocalDescription(
-        answer
-      );
+      await this.pc.setLocalDescription(answer);
 
-      this.socket.emit(
-        "call-answer",
-        {
-          toPhone:
-            fromPhone,
+      this.socket.emit("call-answer", {
+        toPhone: fromPhone,
+        answer: this.pc.localDescription,
+      });
 
-          answer:
-            this.pc
-              .localDescription,
-        }
-      );
-
-      this.setStatus(
-        "Connecting..."
-      );
-
-      this.updateCallUI(
-        this.callType
-      );
+      this.setStatus("Connecting...");
+      this.updateCallUI(this.callType);
     } catch (err) {
-      console.error(
-        "Accept call error:",
-        err
-      );
-
+      console.error("Accept call error:", err);
       this.hangup(true);
     }
   }
@@ -466,17 +302,10 @@ class RTC {
   // ====================================================
 
   hangup(silent = false) {
-    if (
-      !silent &&
-      this.peerPhone
-    ) {
-      this.socket.emit(
-        "end-call",
-        {
-          toPhone:
-            this.peerPhone,
-        }
-      );
+    if (!silent && this.peerPhone) {
+      this.socket.emit("end-call", {
+        toPhone: this.peerPhone,
+      });
     }
 
     if (this.pc) {
@@ -490,27 +319,16 @@ class RTC {
     if (this.localStream) {
       this.localStream
         .getTracks()
-        .forEach(
-          (track) =>
-            track.stop()
-        );
+        .forEach((track) => track.stop());
 
-      this.localStream =
-        null;
+      this.localStream = null;
     }
 
-    [
-      "remote-video",
-      "local-video",
-    ].forEach((id) => {
-      const element =
-        document.getElementById(
-          id
-        );
+    ["remote-video", "local-video"].forEach((id) => {
+      const element = document.getElementById(id);
 
       if (element) {
-        element.srcObject =
-          null;
+        element.srcObject = null;
       }
     });
 
@@ -520,43 +338,19 @@ class RTC {
     this.muted = false;
     this.camOff = false;
 
-    const overlay =
-      document.getElementById(
-        "call-overlay"
-      );
+    const overlay = document.getElementById("call-overlay");
 
     if (overlay) {
-      overlay.classList.add(
-        "hidden"
-      );
+      overlay.classList.add("hidden");
     }
 
-    const mute =
-      document.getElementById(
-        "btn-mute"
-      );
+    const mute = document.getElementById("btn-mute");
+    const cam = document.getElementById("btn-cam");
+    const speaker = document.getElementById("btn-spk");
 
-    const cam =
-      document.getElementById(
-        "btn-cam"
-      );
-
-    const speaker =
-      document.getElementById(
-        "btn-spk"
-      );
-
-    mute?.classList.remove(
-      "active"
-    );
-
-    cam?.classList.remove(
-      "active"
-    );
-
-    speaker?.classList.remove(
-      "active"
-    );
+    mute?.classList.remove("active");
+    cam?.classList.remove("active");
+    speaker?.classList.remove("active");
   }
 
   // ====================================================
@@ -568,24 +362,17 @@ class RTC {
       return;
     }
 
-    this.muted =
-      !this.muted;
+    this.muted = !this.muted;
 
     this.localStream
       .getAudioTracks()
       .forEach((track) => {
-        track.enabled =
-          !this.muted;
+        track.enabled = !this.muted;
       });
 
     document
-      .getElementById(
-        "btn-mute"
-      )
-      ?.classList.toggle(
-        "active",
-        this.muted
-      );
+      .getElementById("btn-mute")
+      ?.classList.toggle("active", this.muted);
   }
 
   // ====================================================
@@ -597,41 +384,25 @@ class RTC {
       return;
     }
 
-    const tracks =
-      this.localStream
-        .getVideoTracks();
+    const tracks = this.localStream.getVideoTracks();
 
     if (!tracks.length) {
       return;
     }
 
-    this.camOff =
-      !this.camOff;
+    this.camOff = !this.camOff;
 
-    tracks.forEach(
-      (track) => {
-        track.enabled =
-          !this.camOff;
-      }
-    );
+    tracks.forEach((track) => {
+      track.enabled = !this.camOff;
+    });
 
     document
-      .getElementById(
-        "btn-cam"
-      )
-      ?.classList.toggle(
-        "active",
-        this.camOff
-      );
+      .getElementById("btn-cam")
+      ?.classList.toggle("active", this.camOff);
 
     document
-      .getElementById(
-        "local-video"
-      )
-      ?.classList.toggle(
-        "hidden",
-        this.camOff
-      );
+      .getElementById("local-video")
+      ?.classList.toggle("hidden", this.camOff);
   }
 
   // ====================================================
@@ -640,86 +411,45 @@ class RTC {
 
   updateCallUI(callType) {
     const localVideo =
-      document.getElementById(
-        "local-video"
-      );
+      document.getElementById("local-video");
 
     const remoteVideo =
-      document.getElementById(
-        "remote-video"
-      );
+      document.getElementById("remote-video");
 
     const audioAvatar =
-      document.getElementById(
-        "audio-avatar"
-      );
+      document.getElementById("audio-avatar");
 
     const btnCam =
-      document.getElementById(
-        "btn-cam"
-      );
+      document.getElementById("btn-cam");
 
     const btnSpeaker =
-      document.getElementById(
-        "btn-spk"
-      );
+      document.getElementById("btn-spk");
 
     const overlay =
-      document.getElementById(
-        "call-overlay"
-      );
+      document.getElementById("call-overlay");
 
-    overlay?.classList.remove(
-      "hidden"
-    );
+    overlay?.classList.remove("hidden");
 
-    // IMPORTANT:
-    // speaker button starts OFF
-    btnSpeaker?.classList.remove(
-      "active"
-    );
+    // Default Speaker UI → OFF (Standard audio output)
+    btnSpeaker?.classList.remove("active");
 
     if (remoteVideo) {
-      remoteVideo.volume =
-        0.4;
+      remoteVideo.volume = 0.4;
     }
 
     if (callType === "video") {
-      remoteVideo?.classList.remove(
-        "hidden"
-      );
+      remoteVideo?.classList.remove("hidden");
+      localVideo?.classList.remove("hidden");
+      audioAvatar?.classList.add("hidden");
 
-      localVideo?.classList.remove(
-        "hidden"
-      );
-
-      audioAvatar?.classList.add(
-        "hidden"
-      );
-
-      btnCam?.classList.remove(
-        "hidden"
-      );
-
-      btnCam?.classList.remove(
-        "active"
-      );
+      btnCam?.classList.remove("hidden");
+      btnCam?.classList.remove("active");
     } else {
-      remoteVideo?.classList.add(
-        "hidden"
-      );
+      remoteVideo?.classList.add("hidden");
+      localVideo?.classList.add("hidden");
+      audioAvatar?.classList.remove("hidden");
 
-      localVideo?.classList.add(
-        "hidden"
-      );
-
-      audioAvatar?.classList.remove(
-        "hidden"
-      );
-
-      btnCam?.classList.add(
-        "hidden"
-      );
+      btnCam?.classList.add("hidden");
     }
   }
 
@@ -729,13 +459,10 @@ class RTC {
 
   setStatus(message) {
     const status =
-      document.getElementById(
-        "call-status-text"
-      );
+      document.getElementById("call-status-text");
 
     if (status) {
-      status.textContent =
-        message;
+      status.textContent = message;
     }
   }
 }

@@ -2714,7 +2714,7 @@ function appendBubble(
 
 
   // ==========================================
-  // OWN MESSAGE → MENU
+  // OWN MESSAGE → MENU & LONG PRESS
   // ==========================================
 
   if (
@@ -2843,6 +2843,65 @@ function appendBubble(
         menu.classList.toggle(
           "hidden"
         );
+      }
+    );
+
+
+    // ==========================================
+    // MOBILE LONG PRESS (600ms hold)
+    // ==========================================
+    let longPressTimer = null;
+
+    wrapper.addEventListener(
+      "touchstart",
+      () => {
+        longPressTimer = setTimeout(
+          () => {
+
+            // Close other open message menus
+            document
+              .querySelectorAll(".message-menu")
+              .forEach((otherMenu) => {
+
+                if (otherMenu !== menu) {
+                  otherMenu.classList.add("hidden");
+                }
+
+              });
+
+            // Open Edit/Delete menu
+            menu.classList.remove("hidden");
+
+            // Small vibration on supported phones
+            if (navigator.vibrate) {
+              navigator.vibrate(40);
+            }
+
+          },
+          600
+        );
+      },
+      { passive: true }
+    );
+
+    wrapper.addEventListener(
+      "touchend",
+      () => {
+        clearTimeout(longPressTimer);
+      }
+    );
+
+    wrapper.addEventListener(
+      "touchmove",
+      () => {
+        clearTimeout(longPressTimer);
+      }
+    );
+
+    wrapper.addEventListener(
+      "touchcancel",
+      () => {
+        clearTimeout(longPressTimer);
       }
     );
 
