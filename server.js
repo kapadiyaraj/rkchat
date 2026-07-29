@@ -20,6 +20,28 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 // ======================================================
+// HELPER: INDIA TIME & DATE FORMATTER (IST)
+// ======================================================
+function getIndianTimeAndDate() {
+  const now = new Date();
+
+  // Indian Time (e.g. 06:30 PM)
+  const timestamp = now.toLocaleTimeString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  // Indian Date (YYYY-MM-DD for easier front-end group comparison)
+  const dateStr = now.toLocaleDateString("en-CA", {
+    timeZone: "Asia/Kolkata",
+  }); // returns YYYY-MM-DD in IST
+
+  return { timestamp, dateStr };
+}
+
+// ======================================================
 // DATABASE
 // ======================================================
 
@@ -53,23 +75,19 @@ function createToken(user) {
 
 // ======================================================
 // REGISTER
-// Name = profile name
-// Phone + password = authentication
 // ======================================================
 
 app.post("/api/auth/register", async (req, res) => {
   try {
     const username = String(req.body.username || "").trim();
 
-    const phone = String(req.body.phone || "")
-      .replace(/\D/g, "");
+    const phone = String(req.body.phone || "").replace(/\D/g, "");
 
     const password = String(req.body.password || "");
 
     if (!username || !phone || !password) {
       return res.status(400).json({
-        message:
-          "Name, mobile number and password are required.",
+        message: "Name, mobile number and password are required.",
       });
     }
 
@@ -81,8 +99,7 @@ app.post("/api/auth/register", async (req, res) => {
 
     if (password.length < 6) {
       return res.status(400).json({
-        message:
-          "Password must be at least 6 characters.",
+        message: "Password must be at least 6 characters.",
       });
     }
 
@@ -90,15 +107,11 @@ app.post("/api/auth/register", async (req, res) => {
 
     if (existingUser) {
       return res.status(409).json({
-        message:
-          "This mobile number is already registered. Please login.",
+        message: "This mobile number is already registered. Please login.",
       });
     }
 
-    const hashedPassword = await bcrypt.hash(
-      password,
-      12
-    );
+    const hashedPassword = await bcrypt.hash(password, 12);
 
     const user = await User.create({
       username,
@@ -110,7 +123,6 @@ app.post("/api/auth/register", async (req, res) => {
 
     return res.status(201).json({
       token,
-
       user: {
         username: user.username,
         phone: user.phone,
@@ -118,7 +130,6 @@ app.post("/api/auth/register", async (req, res) => {
     });
   } catch (err) {
     console.error("REGISTER ERROR:", err);
-
     return res.status(500).json({
       message: "Registration failed.",
     });
@@ -131,15 +142,12 @@ app.post("/api/auth/register", async (req, res) => {
 
 app.post("/api/auth/login", async (req, res) => {
   try {
-    const phone = String(req.body.phone || "")
-      .replace(/\D/g, "");
-
+    const phone = String(req.body.phone || "").replace(/\D/g, "");
     const password = String(req.body.password || "");
 
     if (!phone || !password) {
       return res.status(400).json({
-        message:
-          "Mobile number and password are required.",
+        message: "Mobile number and password are required.",
       });
     }
 
@@ -147,12 +155,10 @@ app.post("/api/auth/login", async (req, res) => {
 
     if (!user) {
       return res.status(401).json({
-        message:
-          "Invalid mobile number or password.",
+        message: "Invalid mobile number or password.",
       });
     }
 
-    // Old database user may not have password
     if (!user.password) {
       return res.status(401).json({
         message:
@@ -160,15 +166,11 @@ app.post("/api/auth/login", async (req, res) => {
       });
     }
 
-    const passwordCorrect = await bcrypt.compare(
-      password,
-      user.password
-    );
+    const passwordCorrect = await bcrypt.compare(password, user.password);
 
     if (!passwordCorrect) {
       return res.status(401).json({
-        message:
-          "Invalid mobile number or password.",
+        message: "Invalid mobile number or password.",
       });
     }
 
@@ -176,7 +178,6 @@ app.post("/api/auth/login", async (req, res) => {
 
     return res.json({
       token,
-
       user: {
         username: user.username,
         phone: user.phone,
@@ -184,7 +185,6 @@ app.post("/api/auth/login", async (req, res) => {
     });
   } catch (err) {
     console.error("LOGIN ERROR:", err);
-
     return res.status(500).json({
       message: "Login failed.",
     });
@@ -197,25 +197,17 @@ app.post("/api/auth/login", async (req, res) => {
 
 app.get("/api/auth/me", async (req, res) => {
   try {
-    const authorization =
-      req.headers.authorization;
+    const authorization = req.headers.authorization;
 
-    if (
-      !authorization ||
-      !authorization.startsWith("Bearer ")
-    ) {
+    if (!authorization || !authorization.startsWith("Bearer ")) {
       return res.status(401).json({
         message: "Unauthorized.",
       });
     }
 
-    const token =
-      authorization.substring(7);
+    const token = authorization.substring(7);
 
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET
-    );
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     const user = await User.findById(decoded.id);
 
@@ -233,20 +225,16 @@ app.get("/api/auth/me", async (req, res) => {
     });
   } catch (err) {
     return res.status(401).json({
-      message:
-        "Session expired or token is invalid.",
+      message: "Session expired or token is invalid.",
     });
   }
 });
 
 // ======================================================
 // ONLINE USERS
-// phone -> { socketId, username, phone, online }
 // ======================================================
 
 const users = {};
-
-// socketId -> phone
 const socketToPhone = {};
 
 // ======================================================
@@ -255,27 +243,17 @@ const socketToPhone = {};
 
 io.use((socket, next) => {
   try {
-    const token =
-      socket.handshake.auth?.token;
+    const token = socket.handshake.auth?.token;
 
     if (!token) {
-      return next(
-        new Error("Authentication required")
-      );
+      return next(new Error("Authentication required"));
     }
 
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET
-    );
-
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     socket.user = decoded;
-
     next();
   } catch (err) {
-    next(
-      new Error("Invalid authentication")
-    );
+    next(new Error("Invalid authentication"));
   }
 });
 
@@ -287,9 +265,7 @@ io.on("connection", async (socket) => {
   let currentUser;
 
   try {
-    currentUser = await User.findById(
-      socket.user.id
-    );
+    currentUser = await User.findById(socket.user.id);
 
     if (!currentUser) {
       socket.disconnect(true);
@@ -316,14 +292,9 @@ io.on("connection", async (socket) => {
   socket.data.phone = phone;
   socket.data.username = username;
 
-  console.log(
-    `🟢 Online: ${username} (${phone})`
-  );
+  console.log(`🟢 Online: ${username} (${phone})`);
 
-  // Tell everyone else
-  socket.broadcast.emit("user-online", {
-    phone,
-  });
+  socket.broadcast.emit("user-online", { phone });
 
   // ====================================================
   // LOAD CONTACTS
@@ -331,16 +302,12 @@ io.on("connection", async (socket) => {
 
   socket.on("load-contacts", async () => {
     try {
-      const user = await User.findOne({
-        phone: socket.data.phone,
-      });
+      const user = await User.findOne({ phone: socket.data.phone });
 
       const result = [];
 
       for (const contact of user?.contacts || []) {
-        const dbUser = await User.findOne({
-          phone: contact.phone,
-        }).select(
+        const dbUser = await User.findOne({ phone: contact.phone }).select(
           "username phone lastSeen"
         );
 
@@ -349,389 +316,216 @@ io.on("connection", async (socket) => {
         result.push({
           phone: dbUser.phone,
           username: dbUser.username,
-
-          online: Boolean(
-            users[dbUser.phone]
-          ),
-
-          lastSeen:
-            dbUser.lastSeen || null,
+          online: Boolean(users[dbUser.phone]),
+          lastSeen: dbUser.lastSeen || null,
         });
       }
 
-      socket.emit(
-        "contacts-loaded",
-        result
-      );
+      socket.emit("contacts-loaded", result);
     } catch (err) {
-      console.error(
-        "LOAD CONTACTS ERROR:",
-        err
-      );
+      console.error("LOAD CONTACTS ERROR:", err);
     }
   });
 
+  // ====================================================
+  // CLEAR CHAT
+  // ====================================================
 
-  // ─────────────────────────────────────────────
-// CLEAR CHAT
-// Deletes conversation for BOTH users
-// ─────────────────────────────────────────────
+  socket.on("clear-chat", async ({ otherPhone }) => {
+    try {
+      const myPhone = socket.data.phone;
 
-socket.on("clear-chat", async ({ otherPhone }) => {
-  try {
-    const myPhone = socket.data.phone;
+      if (!myPhone || !otherPhone || myPhone === otherPhone) {
+        return socket.emit("clear-chat-error", "Invalid request.");
+      }
 
-    // User must be logged in / registered on socket
-    if (!myPhone) {
-      socket.emit("clear-chat-error", "You are not authenticated.");
-      return;
-    }
-
-    if (!otherPhone) {
-      socket.emit("clear-chat-error", "Invalid contact.");
-      return;
-    }
-
-    if (myPhone === otherPhone) {
-      socket.emit("clear-chat-error", "Invalid conversation.");
-      return;
-    }
-
-    // Delete BOTH directions:
-    // Me -> Friend
-    // Friend -> Me
-
-    const result = await Message.deleteMany({
-      $or: [
-        {
-          fromPhone: myPhone,
-          toPhone: otherPhone,
-        },
-        {
-          fromPhone: otherPhone,
-          toPhone: myPhone,
-        },
-      ],
-    });
-
-    console.log(
-      `Chat cleared: ${myPhone} <-> ${otherPhone}. Deleted: ${result.deletedCount}`
-    );
-
-    // Tell current user
-    socket.emit("chat-cleared", {
-      otherPhone,
-    });
-
-    // Tell other user if online
-    const target = users[otherPhone];
-
-    if (target && target.online) {
-      io.to(target.socketId).emit("chat-cleared", {
-        otherPhone: myPhone,
+      const result = await Message.deleteMany({
+        $or: [
+          { fromPhone: myPhone, toPhone: otherPhone },
+          { fromPhone: otherPhone, toPhone: myPhone },
+        ],
       });
+
+      console.log(`Chat cleared: ${myPhone} <-> ${otherPhone}. Deleted: ${result.deletedCount}`);
+
+      socket.emit("chat-cleared", { otherPhone });
+
+      const target = users[otherPhone];
+      if (target && target.online) {
+        io.to(target.socketId).emit("chat-cleared", { otherPhone: myPhone });
+      }
+    } catch (err) {
+      console.error("Clear Chat Error:", err);
+      socket.emit("clear-chat-error", "Unable to clear chat.");
     }
-
-  } catch (err) {
-
-    console.error("Clear Chat Error:", err);
-
-    socket.emit(
-      "clear-chat-error",
-      "Unable to clear chat. Please try again."
-    );
-  }
-});
+  });
 
   // ====================================================
   // FIND CONTACT
-  // Search registered users even if offline
   // ====================================================
 
-  socket.on(
-    "find-contact",
-    async ({ phone }) => {
-      try {
-        const searchPhone = String(
-          phone || ""
-        ).replace(/\D/g, "");
+  socket.on("find-contact", async ({ phone }) => {
+    try {
+      const searchPhone = String(phone || "").replace(/\D/g, "");
 
-        if (
-          searchPhone === socket.data.phone
-        ) {
-          return socket.emit(
-            "contact-error",
-            "That's your own number!"
-          );
-        }
-
-        const foundUser =
-          await User.findOne({
-            phone: searchPhone,
-          }).select(
-            "username phone lastSeen"
-          );
-
-        if (!foundUser) {
-          return socket.emit(
-            "contact-error",
-            "No user found with that number."
-          );
-        }
-
-        socket.emit("contact-found", {
-          phone: foundUser.phone,
-          username: foundUser.username,
-
-          online: Boolean(
-            users[foundUser.phone]
-          ),
-
-          lastSeen:
-            foundUser.lastSeen || null,
-        });
-      } catch (err) {
-        console.error(
-          "FIND CONTACT ERROR:",
-          err
-        );
-
-        socket.emit(
-          "contact-error",
-          "Unable to search user."
-        );
+      if (searchPhone === socket.data.phone) {
+        return socket.emit("contact-error", "That's your own number!");
       }
+
+      const foundUser = await User.findOne({ phone: searchPhone }).select(
+        "username phone lastSeen"
+      );
+
+      if (!foundUser) {
+        return socket.emit("contact-error", "No user found with that number.");
+      }
+
+      socket.emit("contact-found", {
+        phone: foundUser.phone,
+        username: foundUser.username,
+        online: Boolean(users[foundUser.phone]),
+        lastSeen: foundUser.lastSeen || null,
+      });
+    } catch (err) {
+      console.error("FIND CONTACT ERROR:", err);
+      socket.emit("contact-error", "Unable to search user.");
     }
-  );
+  });
 
   // ====================================================
   // SAVE CONTACT
-  // ownerPhone comes from JWT, NOT frontend
   // ====================================================
 
-  socket.on(
-    "save-contact",
-    async ({
-      contactPhone,
-      contactName,
-    }) => {
-      try {
-        const ownerPhone =
-          socket.data.phone;
+  socket.on("save-contact", async ({ contactPhone, contactName }) => {
+    try {
+      const ownerPhone = socket.data.phone;
 
-        const targetUser =
-          await User.findOne({
-            phone: contactPhone,
-          });
+      const targetUser = await User.findOne({ phone: contactPhone });
 
-        if (!targetUser) {
-          return socket.emit(
-            "contact-error",
-            "User does not exist."
-          );
-        }
-
-        if (
-          contactPhone === ownerPhone
-        ) {
-          return socket.emit(
-            "contact-error",
-            "You cannot add yourself."
-          );
-        }
-
-        const owner =
-          await User.findOne({
-            phone: ownerPhone,
-          });
-
-        const alreadyExists =
-          owner.contacts.some(
-            (contact) =>
-              contact.phone ===
-              contactPhone
-          );
-
-        if (!alreadyExists) {
-          owner.contacts.push({
-            phone: contactPhone,
-
-            username:
-              targetUser.username ||
-              contactName,
-          });
-
-          await owner.save();
-        }
-
-        socket.emit("contact-saved");
-      } catch (err) {
-        console.error(
-          "SAVE CONTACT ERROR:",
-          err
-        );
+      if (!targetUser) {
+        return socket.emit("contact-error", "User does not exist.");
       }
+
+      if (contactPhone === ownerPhone) {
+        return socket.emit("contact-error", "You cannot add yourself.");
+      }
+
+      const owner = await User.findOne({ phone: ownerPhone });
+
+      const alreadyExists = owner.contacts.some(
+        (contact) => contact.phone === contactPhone
+      );
+
+      if (!alreadyExists) {
+        owner.contacts.push({
+          phone: contactPhone,
+          username: targetUser.username || contactName,
+        });
+
+        await owner.save();
+      }
+
+      socket.emit("contact-saved");
+    } catch (err) {
+      console.error("SAVE CONTACT ERROR:", err);
     }
-  );
+  });
 
   // ====================================================
   // LOAD MESSAGES
-  // myPhone always comes from authenticated socket
   // ====================================================
 
-  socket.on(
-    "load-messages",
-    async ({ otherPhone }) => {
-      try {
-        const myPhone =
-          socket.data.phone;
+  socket.on("load-messages", async ({ otherPhone }) => {
+    try {
+      const myPhone = socket.data.phone;
 
-        const messages =
-          await Message.find({
-            $or: [
-              {
-                fromPhone: myPhone,
-                toPhone: otherPhone,
-              },
+      const messages = await Message.find({
+        $or: [
+          { fromPhone: myPhone, toPhone: otherPhone },
+          { fromPhone: otherPhone, toPhone: myPhone },
+        ],
+      }).sort({ createdAt: 1 });
 
-              {
-                fromPhone: otherPhone,
-                toPhone: myPhone,
-              },
-            ],
-          }).sort({
-            createdAt: 1,
-          });
-
-        socket.emit(
-          "message-history",
-          messages
-        );
-      } catch (err) {
-        console.error(
-          "LOAD MESSAGES ERROR:",
-          err
-        );
-      }
+      socket.emit("message-history", messages);
+    } catch (err) {
+      console.error("LOAD MESSAGES ERROR:", err);
     }
-  );
+  });
 
- // ====================================================
-// SEND MESSAGE
-// ====================================================
+  // ====================================================
+  // SEND MESSAGE (Indian Standard Time Added)
+  // ====================================================
 
-socket.on(
-  "send-message",
-  async ({ toPhone, message }) => {
+  socket.on("send-message", async ({ toPhone, message }) => {
     try {
       const fromPhone = socket.data.phone;
       const fromName = socket.data.username;
 
-      const cleanMessage =
-        String(message || "").trim();
+      const cleanMessage = String(message || "").trim();
 
       if (!cleanMessage) return;
 
-      const receiver =
-        await User.findOne({ phone: toPhone });
+      const receiver = await User.findOne({ phone: toPhone });
 
       if (!receiver) {
-        return socket.emit(
-          "message-error",
-          "Receiver does not exist."
-        );
+        return socket.emit("message-error", "Receiver does not exist.");
       }
 
-      const timestamp =
-        new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
+      // Exact India Time & Date
+      const { timestamp, dateStr } = getIndianTimeAndDate();
 
-      // IMPORTANT: save returned document
-      const savedMessage =
-        await Message.create({
-          fromPhone,
-          toPhone,
-          message: cleanMessage,
-          timestamp,
-        });
+      const savedMessage = await Message.create({
+        fromPhone,
+        toPhone,
+        message: cleanMessage,
+        timestamp,
+        date: dateStr, // YYYY-MM-DD
+      });
 
       const payload = {
-        messageId:
-          savedMessage._id.toString(),
-
+        messageId: savedMessage._id.toString(),
         fromPhone,
         fromName,
         toPhone,
-
-        message:
-          savedMessage.message,
-
-        timestamp:
-          savedMessage.timestamp,
-
+        message: savedMessage.message,
+        timestamp: savedMessage.timestamp,
+        date: savedMessage.date || dateStr,
+        createdAt: savedMessage.createdAt,
         edited: false,
       };
 
       const target = users[toPhone];
 
       if (target) {
-        io.to(target.socketId).emit(
-          "receive-message",
-          payload
-        );
+        io.to(target.socketId).emit("receive-message", payload);
       }
 
-      socket.emit(
-        "message-sent",
-        payload
-      );
-
+      socket.emit("message-sent", payload);
     } catch (err) {
-      console.error(
-        "SEND MESSAGE ERROR:",
-        err
-      );
+      console.error("SEND MESSAGE ERROR:", err);
     }
-  }
-);
+  });
 
+  // ====================================================
+  // EDIT MESSAGE
+  // ====================================================
 
-// ====================================================
-// EDIT MESSAGE
-// Sender only
-// ====================================================
-
-socket.on(
-  "edit-message",
-  async ({ messageId, newMessage }) => {
+  socket.on("edit-message", async ({ messageId, newMessage }) => {
     try {
-      const myPhone =
-        socket.data.phone;
+      const myPhone = socket.data.phone;
 
-      const cleanMessage =
-        String(newMessage || "").trim();
+      const cleanMessage = String(newMessage || "").trim();
 
       if (!messageId || !cleanMessage) {
-        return socket.emit(
-          "message-action-error",
-          "Invalid message."
-        );
+        return socket.emit("message-action-error", "Invalid message.");
       }
 
-      const message =
-        await Message.findById(messageId);
+      const message = await Message.findById(messageId);
 
       if (!message) {
-        return socket.emit(
-          "message-action-error",
-          "Message not found."
-        );
+        return socket.emit("message-action-error", "Message not found.");
       }
 
-      // SECURITY:
-      // only sender can edit
       if (message.fromPhone !== myPhone) {
         return socket.emit(
           "message-action-error",
@@ -740,91 +534,49 @@ socket.on(
       }
 
       message.message = cleanMessage;
-
-      // Works even if edited wasn't in old documents
       message.edited = true;
 
       await message.save();
 
       const payload = {
-        messageId:
-          message._id.toString(),
-
-        fromPhone:
-          message.fromPhone,
-
-        toPhone:
-          message.toPhone,
-
-        message:
-          message.message,
-
-        timestamp:
-          message.timestamp,
-
+        messageId: message._id.toString(),
+        fromPhone: message.fromPhone,
+        toPhone: message.toPhone,
+        message: message.message,
+        timestamp: message.timestamp,
+        date: message.date,
         edited: true,
       };
 
-      // Update sender
-      socket.emit(
-        "message-edited",
-        payload
-      );
+      socket.emit("message-edited", payload);
 
-      // Update receiver
-      const target =
-        users[message.toPhone];
+      const target = users[message.toPhone];
 
       if (target) {
-        io.to(target.socketId).emit(
-          "message-edited",
-          payload
-        );
+        io.to(target.socketId).emit("message-edited", payload);
       }
-
     } catch (err) {
-      console.error(
-        "EDIT MESSAGE ERROR:",
-        err
-      );
-
-      socket.emit(
-        "message-action-error",
-        "Unable to edit message."
-      );
+      console.error("EDIT MESSAGE ERROR:", err);
+      socket.emit("message-action-error", "Unable to edit message.");
     }
-  }
-);
+  });
 
+  // ====================================================
+  // DELETE MESSAGE
+  // ====================================================
 
-// ====================================================
-// DELETE MESSAGE
-// Delete for everyone - sender only
-// ====================================================
-
-socket.on(
-  "delete-message",
-  async ({ messageId }) => {
+  socket.on("delete-message", async ({ messageId }) => {
     try {
-      const myPhone =
-        socket.data.phone;
+      const myPhone = socket.data.phone;
 
-      if (!messageId) {
-        return;
-      }
+      if (!messageId) return;
 
-      const message =
-        await Message.findById(messageId);
+      const message = await Message.findById(messageId);
 
       if (!message) {
-        return socket.emit(
-          "message-action-error",
-          "Message not found."
-        );
+        return socket.emit("message-action-error", "Message not found.");
       }
 
-      // SECURITY:
-      // only sender can delete
       if (message.fromPhone !== myPhone) {
         return socket.emit(
           "message-action-error",
@@ -832,288 +584,152 @@ socket.on(
         );
       }
 
-      const otherPhone =
-        message.toPhone;
+      const otherPhone = message.toPhone;
 
-      await Message.deleteOne({
-        _id: message._id,
-      });
+      await Message.deleteOne({ _id: message._id });
 
       const payload = {
-        messageId:
-          message._id.toString(),
-
-        fromPhone:
-          message.fromPhone,
-
-        toPhone:
-          message.toPhone,
+        messageId: message._id.toString(),
+        fromPhone: message.fromPhone,
+        toPhone: message.toPhone,
       };
 
-      // Sender
-      socket.emit(
-        "message-deleted",
-        payload
-      );
+      socket.emit("message-deleted", payload);
 
-      // Receiver
-      const target =
-        users[otherPhone];
+      const target = users[otherPhone];
 
       if (target) {
-        io.to(target.socketId).emit(
-          "message-deleted",
-          payload
-        );
+        io.to(target.socketId).emit("message-deleted", payload);
       }
-
     } catch (err) {
-      console.error(
-        "DELETE MESSAGE ERROR:",
-        err
-      );
-
-      socket.emit(
-        "message-action-error",
-        "Unable to delete message."
-      );
+      console.error("DELETE MESSAGE ERROR:", err);
+      socket.emit("message-action-error", "Unable to delete message.");
     }
-  }
-);
+  });
 
   // ====================================================
   // TYPING
   // ====================================================
 
-  socket.on(
-    "typing",
-    ({ toPhone, isTyping }) => {
-      const target =
-        users[toPhone];
+  socket.on("typing", ({ toPhone, isTyping }) => {
+    const target = users[toPhone];
 
-      if (!target) return;
+    if (!target) return;
 
-      io.to(
-        target.socketId
-      ).emit("typing", {
-        fromPhone:
-          socket.data.phone,
-
-        isTyping:
-          Boolean(isTyping),
-      });
-    }
-  );
+    io.to(target.socketId).emit("typing", {
+      fromPhone: socket.data.phone,
+      isTyping: Boolean(isTyping),
+    });
+  });
 
   // ====================================================
   // CALL USER
   // ====================================================
 
-  socket.on(
-    "call-user",
-    ({
-      toPhone,
-      offer,
-      callType,
-    }) => {
-      const target =
-        users[toPhone];
+  socket.on("call-user", ({ toPhone, offer, callType }) => {
+    const target = users[toPhone];
 
-      if (
-        target &&
-        target.online
-      ) {
-        io.to(
-          target.socketId
-        ).emit(
-          "incoming-call",
-          {
-            fromPhone:
-              socket.data.phone,
-
-            fromName:
-              socket.data.username,
-
-            offer,
-            callType,
-          }
-        );
-      } else {
-        socket.emit(
-          "call-failed",
-          "User is not online."
-        );
-      }
+    if (target && target.online) {
+      io.to(target.socketId).emit("incoming-call", {
+        fromPhone: socket.data.phone,
+        fromName: socket.data.username,
+        offer,
+        callType,
+      });
+    } else {
+      socket.emit("call-failed", "User is not online.");
     }
-  );
+  });
 
   // ====================================================
   // CALL ANSWER
   // ====================================================
 
-  socket.on(
-    "call-answer",
-    ({ toPhone, answer }) => {
-      const target =
-        users[toPhone];
+  socket.on("call-answer", ({ toPhone, answer }) => {
+    const target = users[toPhone];
 
-      if (target) {
-        io.to(
-          target.socketId
-        ).emit(
-          "call-answered",
-          {
-            answer,
-          }
-        );
-      }
+    if (target) {
+      io.to(target.socketId).emit("call-answered", { answer });
     }
-  );
+  });
 
   // ====================================================
-  // ICE
+  // ICE CANDIDATE
   // ====================================================
 
-  socket.on(
-    "ice-candidate",
-    ({
-      toPhone,
-      candidate,
-    }) => {
-      const target =
-        users[toPhone];
+  socket.on("ice-candidate", ({ toPhone, candidate }) => {
+    const target = users[toPhone];
 
-      if (target) {
-        io.to(
-          target.socketId
-        ).emit(
-          "ice-candidate",
-          {
-            candidate,
-          }
-        );
-      }
+    if (target) {
+      io.to(target.socketId).emit("ice-candidate", { candidate });
     }
-  );
+  });
 
   // ====================================================
   // END CALL
   // ====================================================
 
-  socket.on(
-    "end-call",
-    ({ toPhone }) => {
-      const target =
-        users[toPhone];
+  socket.on("end-call", ({ toPhone }) => {
+    const target = users[toPhone];
 
-      if (target) {
-        io.to(
-          target.socketId
-        ).emit(
-          "call-ended"
-        );
-      }
+    if (target) {
+      io.to(target.socketId).emit("call-ended");
     }
-  );
+  });
 
   // ====================================================
   // REJECT CALL
   // ====================================================
 
-  socket.on(
-    "reject-call",
-    ({ toPhone }) => {
-      const target =
-        users[toPhone];
+  socket.on("reject-call", ({ toPhone }) => {
+    const target = users[toPhone];
 
-      if (target) {
-        io.to(
-          target.socketId
-        ).emit(
-          "call-rejected"
-        );
-      }
+    if (target) {
+      io.to(target.socketId).emit("call-rejected");
     }
-  );
+  });
 
   // ====================================================
   // DISCONNECT / LAST SEEN
   // ====================================================
 
-  socket.on(
-    "disconnect",
-    async () => {
-      const disconnectedPhone =
-        socketToPhone[socket.id];
+  socket.on("disconnect", async () => {
+    const disconnectedPhone = socketToPhone[socket.id];
 
-      if (!disconnectedPhone) {
-        return;
-      }
+    if (!disconnectedPhone) return;
 
-      // Only mark offline if this
-      // socket is still current.
-      if (
-        users[disconnectedPhone]
-          ?.socketId === socket.id
-      ) {
-        delete users[
-          disconnectedPhone
-        ];
+    if (users[disconnectedPhone]?.socketId === socket.id) {
+      delete users[disconnectedPhone];
 
-        const lastSeen =
-          new Date();
+      const lastSeen = new Date();
 
-        try {
-          await User.updateOne(
-            {
-              phone:
-                disconnectedPhone,
-            },
-
-            {
-              $set: {
-                lastSeen,
-              },
-            }
-          );
-        } catch (err) {
-          console.error(
-            "LAST SEEN ERROR:",
-            err
-          );
-        }
-
-        socket.broadcast.emit(
-          "user-offline",
-          {
-            phone:
-              disconnectedPhone,
-
-            lastSeen,
-          }
+      try {
+        await User.updateOne(
+          { phone: disconnectedPhone },
+          { $set: { lastSeen } }
         );
+      } catch (err) {
+        console.error("LAST SEEN ERROR:", err);
       }
 
-      delete socketToPhone[
-        socket.id
-      ];
-
-      console.log(
-        `🔴 Offline: ${disconnectedPhone}`
-      );
+      socket.broadcast.emit("user-offline", {
+        phone: disconnectedPhone,
+        lastSeen,
+      });
     }
-  );
+
+    delete socketToPhone[socket.id];
+
+    console.log(`🔴 Offline: ${disconnectedPhone}`);
+  });
 });
 
 // ======================================================
 // SERVER
 // ======================================================
 
-const PORT =
-  process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
-  console.log(
-    `🚀 FriendCall running at http://localhost:${PORT}`
-  );
+  console.log(`🚀 FriendCall running at http://localhost:${PORT}`);
 });
