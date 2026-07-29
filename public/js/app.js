@@ -972,7 +972,6 @@ socket.on("chat-cleared", ({ otherPhone }) => {
   const contact = contacts[otherPhone];
 
   if (contact) {
-    // Clear local cached chat data
     contact.messages = [];
     contact.lastMsg = "";
     contact.lastTime = "";
@@ -980,7 +979,6 @@ socket.on("chat-cleared", ({ otherPhone }) => {
 
     saveContacts();
 
-    // Reset contact list preview
     const last =
       document.getElementById("last_" + otherPhone);
 
@@ -1004,7 +1002,6 @@ socket.on("chat-cleared", ({ otherPhone }) => {
     }
   }
 
-  // Clear visible chat if this conversation is open
   if (activePhone === otherPhone) {
     const messagesContainer =
       document.getElementById("messages");
@@ -1140,7 +1137,6 @@ socket.on(
           true;
       }
 
-      // If edited message is latest
       const last =
         contact.messages[
           contact.messages.length - 1
@@ -1164,7 +1160,6 @@ socket.on(
     }
 
 
-    // Update visible bubble
     const wrapper =
       document.querySelector(
         `[data-message-id="${messageId}"]`
@@ -1296,7 +1291,6 @@ socket.on(
     }
 
 
-    // Remove visible bubble
     document
       .querySelector(
         `[data-message-id="${messageId}"]`
@@ -1449,8 +1443,6 @@ socket.on(
 
   // ====================================================
   // TYPING
-  // WhatsApp style:
-  // typing... replaces online
   // ====================================================
 
   socket.on(
@@ -2278,7 +2270,6 @@ function openChat(phone) {
       "hidden"
     );
 
-  // Old typing bar no longer needed.
   document
     .getElementById(
       "typing-bar"
@@ -2848,15 +2839,18 @@ function appendBubble(
 
 
     // ==========================================
-    // MOBILE LONG PRESS (600ms hold)
+    // MOBILE LONG PRESS (600ms hold with Click Fix)
     // ==========================================
     let longPressTimer = null;
+    let isLongPress = false;
 
     wrapper.addEventListener(
       "touchstart",
       () => {
+        isLongPress = false;
         longPressTimer = setTimeout(
           () => {
+            isLongPress = true;
 
             // Close other open message menus
             document
@@ -2886,8 +2880,11 @@ function appendBubble(
 
     wrapper.addEventListener(
       "touchend",
-      () => {
+      (e) => {
         clearTimeout(longPressTimer);
+        if (isLongPress) {
+          e.preventDefault();
+        }
       }
     );
 
@@ -2932,7 +2929,6 @@ function appendBubble(
 }
 
 
-
 function editMessage(
   messageId,
   currentText
@@ -2950,7 +2946,6 @@ function editMessage(
       currentText
     );
 
-  // Cancel
   if (newText === null) {
     return;
   }
@@ -3113,7 +3108,6 @@ function initCallUI(
   );
 
 
-  // Speaker button default OFF
   btnSpeaker?.classList.remove(
     "active"
   );
@@ -3347,8 +3341,6 @@ document
 
 // ======================================================
 // MUTE
-// RTC handles active class itself.
-// DO NOT toggle it again here.
 // ======================================================
 
 document
@@ -3365,7 +3357,6 @@ document
 
 // ======================================================
 // CAMERA
-// RTC handles UI itself.
 // ======================================================
 
 document
@@ -3382,10 +3373,6 @@ document
 
 // ======================================================
 // SPEAKER BUTTON
-//
-// IMPORTANT:
-// Browser volume is controlled here.
-// Physical phone speaker/earpiece routing depends on browser/device.
 // ======================================================
 
 document
